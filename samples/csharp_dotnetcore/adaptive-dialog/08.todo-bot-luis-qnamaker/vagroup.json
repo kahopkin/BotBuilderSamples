@@ -1,0 +1,81 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "signedExpiry": {
+            "type": "object",
+            "defaultValue": {
+                "signedExpiry": "[dateTimeAdd(utcNow('u'), 'P2Y')]"
+            }
+        }
+    },
+    "variables": {
+        "location": "[resourceGroup().location]",
+        "uniqueSuffix": "[toLower(substring(uniqueString(resourceGroup().id, 'va-resources'), 0, 6))]",
+        "rolloutIdentity": "[concat('va-rollout-id-', variables('uniqueSuffix'))]",
+        "rolloutRoleAssignment": "[concat('va-rollout-role-', variables('uniqueSuffix'))]",
+        "artifactStorageAccountName": "[concat('vastorage', variables('uniqueSuffix'))]",
+        "artifactsReadSasProperties":{
+            "signedServices": "b",
+            "signedPermission": "r",
+            "signedProtocol": "https",
+            "signedResourceTypes": "o"
+        }
+    },
+    "resources": [
+        {
+            "name": "[variables('rolloutIdentity')]",
+            "comments": "user assigned managed identity for deployment manager rollout",
+            "location": "[variables('location')]",
+            "apiVersion": "2018-11-30",
+            "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+            "properties": {}
+        },
+        {
+            "name": "[variables('artifactStorageAccountName')]",
+            "comments": "storage account for hosting deployment artifacts and scripts",
+            "location": "[variables('location')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2019-06-01",
+            "kind": "StorageV2",
+            "properties": {
+                "accessTier": "Hot",
+                "supportsHttpsTrafficOnly": true,
+                "networkAcls": {
+                    "bypass": "AzureServices",
+                    "defaultAction": "Allow",
+                    "ipRules": []
+                }
+            },
+            "sku": {
+                "name":"Standard_RAGRS"
+            },
+            "resources": [
+                {
+                    "name": "default/artifacts",
+                    "type": "blobServices/containers",
+                    "comments": "artifacts container",
+                    "apiVersion": "2019-06-01",
+                    "dependsOn": [
+                        "[variables('artifactStorageAccountName')]"
+                    ]
+                },
+                {
+                    "name": "default/transcripts",
+                    "type": "blobServices/containers",
+                    "comments": "transcripts container",
+                    "apiVersion": "2019-06-01",
+                    "dependsOn": [
+                        "[variables('artifactStorageAccountName')]"
+                    ]
+                }
+            ]
+        }
+    ],
+    "outputs": {
+        "storageSasToken": {
+            "type": "string",
+            "value": "[listAccountSas(variables('artifactStorageAccountName'), '2018-07-01', union(variables('artifactsReadSasProperties'), parameters('signedExpiry'))).accountSasToken]"
+        }
+    }
+}
