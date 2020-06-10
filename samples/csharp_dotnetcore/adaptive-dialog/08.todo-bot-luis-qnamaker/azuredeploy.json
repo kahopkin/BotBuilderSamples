@@ -1,0 +1,240 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "botId": {
+            "type": "string"
+        },
+        "sku": {
+            "type": "string",
+            "defaultValue": "S1",
+            "allowedValues": [
+                "F0",
+                "S1"
+            ]
+        },
+        "msAppId": {
+            "type": "string"
+        },
+        "msAppPassword": {
+            "type": "string"
+        },
+        "displayName": {
+            "type": "string",
+            "defaultValue": ""
+        },
+        "existingServerFarmId": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "use an existing app service plan, if empty creating a P1 app service plan to host the bot app"
+            }
+        },
+        "existingServerFarmLocation": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "If existing app service plan set, this must match the location of the selected app service plan"
+            }
+        },
+        "deployZipUrl": {
+            "type": "bool",
+            "defaultValue": true,
+            "metadata": {
+                "description": "If true, redeploy the zipUrl defined in this template"
+            }
+        }
+    },
+    "variables": {
+        "isNewServerFarm": "[empty(parameters('existingServerFarmId'))]",
+        "location": "[if(variables('isNewServerFarm'), resourceGroup().location, parameters('existingServerFarmLocation'))]",
+        "uniqueSuffix": "[toLower(substring(uniqueString(resourceGroup().id, 'Microsoft.BotService/bots', parameters('botId')), 0, 6))]",
+        "botDisplayName": "[if(empty(parameters('displayName')), parameters('botId'), parameters('displayName'))]",
+        "botAppName": "[toLower(concat(parameters('botId'), '-', variables('uniqueSuffix')))]",
+        "botAppResId": "[resourceId('Microsoft.Web/sites', variables('botAppName'))]",
+        "newServerFarmName": "[toLower(concat(parameters('botId'), '-farm-', variables('uniqueSuffix')))]",
+        "serverFarmId": "[if(variables('isNewServerFarm'), concat(resourceGroup().id, '/providers/Microsoft.Web/serverFarms/', variables('newServerFarmName')), parameters('existingServerFarmId'))]",
+        "keyVaultName": "[concat('bot-secrets-', toLower(substring(uniqueString(resourceGroup().id, 'Microsoft.BotService/bots/keyVaults'), 0, 6)))]",
+        "appPasswordSecret": "[concat(parameters('botId'), '-pwd-', variables('uniqueSuffix'))]",
+        "appPasswordSecretId": "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), variables('appPasswordSecret'))]",
+        "noZipAppSettings": {
+            "MicrosoftAppId": "[parameters('msAppId')]"
+        },
+        "zipUrlSetting": {
+            "WEBSITE_RUN_FROM_PACKAGE": "https://scratchwebdeploy515.blob.core.windows.net/webdeploy/echobot.zip?sp=r&st=2020-05-18T04:43:41Z&se=2020-09-26T12:43:41Z&spr=https&sv=2019-10-10&sr=b&sig=7qSJKDd%2BbxyxZkMtgty8hJ%2Btgft5bOop5vTDKszR5c4%3D"
+        },
+        "appSettingsMap": {
+            "noZipUrl": "[variables('noZipAppSettings')]",
+            "withZipUrl": "[union(variables('noZipAppSettings'), variables('zipUrlSetting'))]"
+        },
+        "appSettings": "[variables('appSettingsMap')[if(parameters('deployZipUrl'), 'withZipUrl', 'noZipUrl')]]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2018-02-01",
+            "name": "[variables('newServerFarmName')]",
+            "location": "[variables('location')]",
+            "condition": "[variables('isNewServerFarm')]",
+            "sku": {
+                "name": "P1v2",
+                "tier": "PremiumV2"
+            }
+        },
+        {
+            "type": "Microsoft.KeyVault/vaults",
+            "name": "[variables('keyVaultName')]",
+            "location": "[variables('location')]",
+            "apiVersion": "2019-09-01",
+            "properties": {
+                "tenantId": "[subscription().tenantId]",
+                "sku": {
+                    "family": "A",
+                    "name": "Standard"
+                },
+                "accessPolicies": [],
+                "enabledForTemplateDeployment": true
+            },
+            "resources": [
+                {
+                    "type": "secrets",
+                    "name": "[variables('appPasswordSecret')]",
+                    "condition": "[not(empty(parameters('msAppPassword')))]",
+                    "apiVersion": "2019-09-01",
+                    "properties": {
+                        "value": "[parameters('msAppPassword')]"
+                    },
+                    "dependsOn": [
+                        "[variables('keyVaultName')]"
+                    ]
+                }
+            ]
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2018-11-01",
+            "kind": "app",
+            "name": "[variables('botAppName')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[variables('newServerFarmName')]",
+                "[variables('appPasswordSecretId')]"
+            ],
+            "properties": {
+                "serverFarmId": "[variables('serverFarmId')]"
+            },
+            "identity": {
+                "type": "SystemAssigned"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/slots",
+            "name": "[concat(variables('botAppName'),'/staging')]",
+            "location": "[variables('location')]",
+            "apiVersion": "2018-11-01",
+            "dependsOn": [
+                "[variables('botAppName')]"
+            ],
+            "properties": {
+                "serverFarmId": "[variables('serverFarmId')]",
+                "siteConfig": {
+                    "appSettings":[]
+                }
+            }
+        },
+        {
+            "type": "Microsoft.KeyVault/vaults/accessPolicies",
+            "name": "[concat(variables('keyVaultName'), '/add')]",
+            "apiVersion": "2019-09-01",
+            "dependsOn": [
+                "[variables('keyVaultName')]",
+                "[variables('botAppResId')]"
+            ],
+            "properties": {
+                "accessPolicies" : [
+                {
+                    "tenantId": "[reference(variables('botAppResId'), '2019-08-01', 'Full').identity.tenantId]",
+                    "objectId": "[reference(variables('botAppResId'), '2019-08-01', 'Full').identity.principalId]",
+                    "permissions": {
+                        "secrets": [ "get" ]
+                    }
+                }]
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/config",
+            "name": "[concat(variables('botAppName'), '/appsettings')]",
+            "location": "[variables('location')]",
+            "apiVersion": "2018-11-01",
+            "dependsOn": [
+                "[variables('botAppResId')]",
+                "[resourceId('Microsoft.KeyVault/vaults/accessPolicies', variables('keyVaultName'), 'add')]"
+            ],
+            "properties": "[union(variables('appSettings'), json(concat('{\"MicrosoftAppPassword\": \"', concat('@Microsoft.KeyVault(SecretUri=', reference(variables('appPasswordSecretId'), '2019-09-01', 'Full').properties.secretUriWithVersion, ')'), '\"}')))]"
+        },
+        {
+            "type": "Microsoft.Web/sites/config",
+            "name": "[concat(variables('botAppName'), '/slotConfigNames')]",
+            "dependsOn": [
+                "[variables('botAppName')]"
+            ],
+            "apiVersion": "2018-11-01",
+            "properties": {
+                "appSettingNames": [
+                    "MicrosoftAppId",
+                    "MicrosoftAppPassword"
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.BotService/botServices",
+            "name": "[parameters('botId')]",
+            "kind": "bot",
+            "apiVersion": "2018-07-12",
+            "location": "global",
+            "sku": {
+                "name": "[parameters('sku')]"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites/config', variables('botAppName'), 'appsettings')]"
+            ],
+            "properties": {
+                "displayName": "[variables('botDisplayName')]",
+                "endpoint": "[concat('https://', reference(variables('botAppResId'), '2018-02-01', 'Full').properties.hostNames[0], '/api/messages')]",
+                "msaAppId": "[parameters('msAppId')]"
+            },
+            "tags": {
+                "hostedBy": "[resourceId('Microsoft.Web/sites', variables('botAppName'))]"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/providers/links",
+            "name": "[concat(variables('botAppName'), '/Microsoft.Resources/provisioned-for')]",
+            "apiVersion": "2018-02-01",
+            "location": "[variables('location')]",
+            "properties": {
+                "targetId": "[resourceId('Microsoft.BotService/bots', parameters('botId'))]",
+                "sourceId": "[resourceId('Microsoft.Web/sites', variables('botAppName'))]"
+            },
+            "dependsOn": [
+                "[variables('botAppName')]",
+                "[parameters('botId')]"
+            ]
+         },
+         {
+            "type": "Microsoft.KeyVault/vaults/secrets/providers/links",
+            "name": "[concat(variables('keyVaultName'), '/', variables('appPasswordSecret'),  '/Microsoft.Resources/provisioned-for')]",
+            "apiVersion": "2018-02-01",
+            "location": "[variables('location')]",
+            "properties": {
+                "targetId": "[resourceId('Microsoft.BotService/bots', parameters('botId'))]",
+                "sourceId": "[variables('appPasswordSecretId')]"
+            },
+            "dependsOn": [
+                "[variables('keyVaultName')]",
+                "[parameters('botId')]"
+            ]
+         }
+
+    ]
+}

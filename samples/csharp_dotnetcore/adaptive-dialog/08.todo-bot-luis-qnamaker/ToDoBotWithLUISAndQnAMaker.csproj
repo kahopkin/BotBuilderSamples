@@ -2,6 +2,10 @@
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
+    <RestoreSources>
+      https://api.nuget.org/v3/index.json;
+      d:\packages;
+    </RestoreSources>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
@@ -23,6 +27,8 @@
     <PackageReference Include="Microsoft.Bot.Builder.LanguageGeneration" Version="4.9.0" />
     <PackageReference Include="Microsoft.Bot.Builder.AI.Luis" Version="4.9.0" />
     <PackageReference Include="Microsoft.Bot.Builder.AI.QnA" Version="4.9.0" />
+    <PackageReference Include="Microsoft.Bot.Builder.Tools.Web" Version="1.0.0" />
+    <PackageReference Include="Microsoft.Bot.Builder.Tools.Build" Version="1.0.23" />
   </ItemGroup>
 
   <ItemGroup>
