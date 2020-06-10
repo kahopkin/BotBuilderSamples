@@ -14,6 +14,7 @@
         "uniqueSuffix": "[toLower(substring(uniqueString(resourceGroup().id, 'va-resources'), 0, 6))]",
         "rolloutIdentity": "[concat('va-rollout-id-', variables('uniqueSuffix'))]",
         "rolloutRoleAssignment": "[concat('va-rollout-role-', variables('uniqueSuffix'))]",
+        "contributorRoleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]",
         "artifactStorageAccountName": "[concat('vastorage', variables('uniqueSuffix'))]",
         "artifactsReadSasProperties":{
             "signedServices": "b",
@@ -21,7 +22,7 @@
             "signedProtocol": "https",
             "signedResourceTypes": "o"
         },
-        "contributorRoleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]"
+        "luisKeyName": "[concat('va-luis-', variables('uniqueSuffix'))]"
     },
     "resources": [
         {
