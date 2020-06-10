@@ -20,7 +20,8 @@
             "signedPermission": "r",
             "signedProtocol": "https",
             "signedResourceTypes": "o"
-        }
+        },
+        "contributorRoleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]"
     },
     "resources": [
         {
@@ -30,6 +31,17 @@
             "apiVersion": "2018-11-30",
             "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
             "properties": {}
+        },
+        {
+            "type": "Microsoft.Authorization/roleAssignments",
+            "comments": "assign contributor role on the resource group to the rollout identity",
+            "apiVersion": "2018-09-01-preview",
+            "name": "[guid(variables('rolloutRoleAssignment'))]",
+            "properties": {
+                "roleDefinitionId": "[variables('contributorRoleDefinitionId')]",
+                "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('rolloutIdentity')), '2018-11-30', 'Full').properties.principalId]",
+                "scope": "[resourceGroup().id]"
+            }
         },
         {
             "name": "[variables('artifactStorageAccountName')]",
@@ -73,6 +85,10 @@
         }
     ],
     "outputs": {
+        "vaRolloutId": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('rolloutIdentity')), '2018-11-30', 'Full').properties.principalId]"
+        },
         "storageSasToken": {
             "type": "string",
             "value": "[listAccountSas(variables('artifactStorageAccountName'), '2018-07-01', union(variables('artifactsReadSasProperties'), parameters('signedExpiry'))).accountSasToken]"
