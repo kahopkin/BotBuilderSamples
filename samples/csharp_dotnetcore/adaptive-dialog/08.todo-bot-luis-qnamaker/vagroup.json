@@ -22,7 +22,7 @@
             "signedProtocol": "https",
             "signedResourceTypes": "o"
         },
-        "luisKeyName": "[concat('va-luis-', variables('uniqueSuffix'))]"
+        "luisAccountName": "[concat('va-luis-', variables('uniqueSuffix'))]"
     },
     "resources": [
         {
@@ -83,6 +83,19 @@
                     ]
                 }
             ]
+        },
+        {
+            "name": "[variables('luisAccountName')]",
+            "comments": "LUIS cognitive service account for LUIS",
+            "location": "[variables('location')]",
+            "type": "Microsoft.CognitiveServices/accounts",
+            "apiVersion": "2016-02-01-preview",
+            "kind": "LUIS",
+            "sku": {
+                "name": "S0"
+            },
+            "properties": {
+            }
         }
     ],
     "outputs": {
@@ -93,6 +106,10 @@
         "storageSasToken": {
             "type": "string",
             "value": "[listAccountSas(variables('artifactStorageAccountName'), '2018-07-01', union(variables('artifactsReadSasProperties'), parameters('signedExpiry'))).accountSasToken]"
+        },
+        "luisAccountKey": {
+            "type": "string",
+            "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', variables('luisAccountName')), '2017-04-18').key1]"
         }
     }
 }
