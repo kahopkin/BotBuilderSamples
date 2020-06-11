@@ -139,6 +139,58 @@ namespace Microsoft.BotBuilderSamples
                             new CodeAction(this.ResolveAndSendQnAAnswer)
                         },
                     },
+                    // Should your QnA Maker KB support multi-turn, you can use an additional OnQnAMatch trigger to continue to rely on QnA Maker to drive the multi-turn conversation.
+                    new OnQnAMatch()
+                    {
+                        Condition = "count(turn.recognized.answers[0].context.prompts) > 0",
+                        Actions = new List<Dialog>()
+                        {
+                            new SetProperty()
+                            {
+                                Property = "dialog.qnaContext",
+                                Value = "=turn.recognized.answers[0].context.prompts"
+                            },
+                            new CodeAction(this.ResolveAndSendQnAAnswer),
+                            new TextInput()
+                            {
+                                Prompt = new ActivityTemplate("${ShowMultiTurnAnswer()}"),
+                                Property = "turn.qnaMultiTurnResponse",
+                                
+                                // We want the user to respond to the follow up prompt. Do not allow interruptions.
+                                AllowInterruptions = false,
+                                
+                                // Since we can have multiple instances of follow up prompts within a single turn, set this to always prompt. 
+                                // Alternate to doing this is to delete the 'turn.qnaMultiTurnResponse' property before the EmitEvent.
+                                AlwaysPrompt = true
+                            },
+                            new SetProperty()
+                            {
+                                Property = "turn.qnaMatchFromContext",
+                                Value = "=where(dialog.qnaContext, item, item.displayText == turn.qnaMultiTurnResponse)"
+                            },
+                            new DeleteProperty()
+                            {
+                                Property = "dialog.qnaContext"
+                            },
+                            new IfCondition()
+                            {
+                                Condition = "turn.qnaMatchFromContext && count(turn.qnaMatchFromContext) > 0",
+                                Actions = new List<Dialog>()
+                                {
+                                    new SetProperty()
+                                    {
+                                        Property = "turn.qnaIdFromPrompt",
+                                        Value = "=turn.qnaMatchFromContext[0].qnaId"
+                                    },
+                                    new EmitEvent()
+                                    {
+                                        EventName = DialogEvents.ActivityReceived,
+                                        EventValue = "=turn.activity"
+                                    }
+                                }
+                            }
+                        }
+                    },
                     // This trigger fires when the recognizers do not agree on who should win.
                     // This enables you to write simple rules to pick a winner or ask the user for disambiguation.
                     new OnChooseIntent()

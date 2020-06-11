@@ -62,3 +62,9 @@
 
 # getAnswerReadBack
 - See an answer from the Knowledge Base
+
+> Generate a BF activity to render the multi-turn answer. Given you are using LG, you can customize the multi-turn choices how ever you desire.
+# ShowMultiTurnAnswer
+[Activity
+    SuggestedActions = ${foreach(turn.recognized.answers[0].context.prompts, x, x.displayText)}
+]

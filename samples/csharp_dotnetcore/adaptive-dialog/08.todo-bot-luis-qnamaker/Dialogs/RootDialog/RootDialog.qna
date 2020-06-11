@@ -8,9 +8,14 @@
 - I need help
 - help please
 - What can I say?
+
 ```
 ${HelpRootDialog()}
 ```
+
+**Prompts:**
+- [todo help](#help-with-todo)
+- [user profile](#help-with-user-profile)
 
 # ?Can I move an item from one list to another?
 - move item
@@ -24,4 +29,20 @@ Sorry, I do not support that yet. But I will let the development team know!
 - profile?
 ```
 I need your profile to provide you the best experience. See http://contoso.com/privacy to learn more about our privacy policy.
+```
+
+# ?help with todo
+- i need help with list management
+
+```
+I can add items or remove items or show you the items in your collections
+```
+
+# ?help with user profile
+- I need help with user profile
+- Why do you need my profile information?
+- what information do you collect? 
+
+```
+I support the profile scenario just as a sample. I really do not need any of that information.
 ```
