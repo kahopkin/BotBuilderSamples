@@ -7,14 +7,21 @@
             "defaultValue": {
                 "signedExpiry": "[dateTimeAdd(utcNow('u'), 'P2Y')]"
             }
+        },
+        "botId": {
+            "type": "string",
+            "defaultValue": "luis-qna-todo-bot"
         }
     },
     "variables": {
         "location": "[resourceGroup().location]",
         "uniqueSuffix": "[toLower(substring(uniqueString(resourceGroup().id, 'va-resources'), 0, 6))]",
         "rolloutIdentity": "[concat('va-rollout-id-', variables('uniqueSuffix'))]",
+        "rolloutIdentityId": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('rolloutIdentity'))]",
         "rolloutRoleAssignment": "[concat('va-rollout-role-', variables('uniqueSuffix'))]",
+        "roleoutRoleAssignmentGuid": "[guid(variables('rolloutRoleAssignment'))]",
         "contributorRoleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]",
+        "botbuildContainer": "[concat('va-botbuild-', variables('uniqueSuffix'))]",
         "artifactStorageAccountName": "[concat('vastorage', variables('uniqueSuffix'))]",
         "artifactsReadSasProperties":{
             "signedServices": "b",
@@ -22,7 +29,15 @@
             "signedProtocol": "https",
             "signedResourceTypes": "o"
         },
-        "luisAccountName": "[concat('va-luis-', variables('uniqueSuffix'))]"
+        "luisAccountName": "[concat('va-luis-', variables('uniqueSuffix'))]",
+        "luisAuthoringName": "[concat('va-luis-author-', variables('uniqueSuffix'))]",
+        "luisAuthorLocationIndex": {
+            "westus": "westus",
+            "westus2": "westus",
+            "eastus": "westus",
+            "centralus": "westus"
+        },
+        "luisAuthorLocation": "[coalesce(variables('luisAuthorLocationIndex')[variables('location')], 'westus')]"
     },
     "resources": [
         {
@@ -37,7 +52,10 @@
             "type": "Microsoft.Authorization/roleAssignments",
             "comments": "assign contributor role on the resource group to the rollout identity",
             "apiVersion": "2018-09-01-preview",
-            "name": "[guid(variables('rolloutRoleAssignment'))]",
+            "dependsOn": [
+                "[variables('rolloutIdentity')]"
+            ],
+            "name": "[variables('roleoutRoleAssignmentGuid')]",
             "properties": {
                 "roleDefinitionId": "[variables('contributorRoleDefinitionId')]",
                 "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('rolloutIdentity')), '2018-11-30', 'Full').properties.principalId]",
@@ -96,12 +114,108 @@
             },
             "properties": {
             }
+        },
+        {
+            "name": "[variables('luisAuthoringName')]",
+            "comments": "LUIS cognitive service account for LUIS",
+            "location": "[variables('luisAuthorLocation')]",
+            "type": "Microsoft.CognitiveServices/accounts",
+            "apiVersion": "2017-04-18",
+            "kind": "LUIS.Authoring",
+            "sku": {
+                "name": "F0"
+            },
+            "properties": {
+            }
+        },
+        {
+            "name": "[variables('botbuildContainer')]",
+            "comments": "container instance to run botbuild",
+            "location": "[variables('location')]",
+            "type": "Microsoft.ContainerInstance/containerGroups",
+            "apiVersion": "2018-10-01",
+            "dependsOn": [
+                "[variables('roleoutRoleAssignmentGuid')]"
+            ],
+            "properties": {
+                "osType": "Linux",
+                "containers":[
+                    {
+                        "name": "botbuild",
+                        "properties": {
+                            "image": "hailiu2586/botbuild:0.0.4",
+                            "command": ["/bin/bash", "-c", "trap : TERM INT; (while true; do sleep 1000; done) & wait"],
+                            "environmentVariables": [
+                                {
+                                    "name": "AZ_SUB_ID",
+                                    "value": "[subscription().subscriptionId]"
+                                },
+                                {
+                                    "name": "AZ_GROUP_NAME",
+                                    "value": "[resourceGroup().name]"
+                                },
+                                {
+                                    "name": "AZ_USER_ASSIGNED_IDENTITY",
+                                    "value": "[variables('rolloutIdentityId')]"
+                                },
+                                {
+                                    "name": "BOT_ARTIFACT",
+                                    "value": "todo-luis-qna-bot/ToDoBotWithLUISAndQnAMaker.zip"
+                                },
+                                {
+                                    "name": "BOT_NAME",
+                                    "value": "[parameters('botId')]"
+                                }
+                            ],
+                            "resources": {
+                                "requests": {
+                                    "cpu": 2,
+                                    "memoryInGB": 4
+                                },
+                                "limits": {
+                                    "cpu": 2,
+                                    "memoryInGB": 4
+                                }
+                            },
+                            "ports": [
+                                {
+                                    "port": 80
+                                },
+                                {
+                                    "port": 8080
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "restartPolicy": "OnFailure",
+                "ipAddress": {
+                    "type": "Public",
+                    "dnsNameLabel": "[variables('botbuildContainer')]",
+                    "ports": [
+                        {
+                            "protocol": "TCP",
+                            "port": 80
+                        },
+                        {
+                            "protocol": "TCP",
+                            "port": 8080
+                        }
+                    ]
+                }
+            },
+            "identity": {
+                "type": "UserAssigned",
+                "userAssignedIdentities": {
+                    "[variables('rolloutIdentityId')]": {}
+                }
+            }
         }
     ],
     "outputs": {
         "vaRolloutId": {
             "type": "string",
-            "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('rolloutIdentity')), '2018-11-30', 'Full').properties.principalId]"
+            "value": "[reference(variables('rolloutIdentityId'), '2018-11-30', 'Full').properties.principalId]"
         },
         "storageSasToken": {
             "type": "string",
@@ -110,6 +224,10 @@
         "luisAccountKey": {
             "type": "string",
             "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', variables('luisAccountName')), '2017-04-18').key1]"
+        },
+        "luisAuthorKey": {
+            "type": "string",
+            "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', variables('luisAuthoringName')), '2017-04-18').key1]"
         }
     }
 }
