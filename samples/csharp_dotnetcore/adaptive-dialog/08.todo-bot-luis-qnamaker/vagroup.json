@@ -143,8 +143,8 @@
                     {
                         "name": "botbuild",
                         "properties": {
-                            "image": "hailiu2586/botbuild:0.0.4",
-                            "command": ["/bin/bash", "-c", "trap : TERM INT; (while true; do sleep 1000; done) & wait"],
+                            "image": "hailiu2586/botbuild:0.0.5",
+                            "command": ["/scripts/cloud-build.sh"],
                             "environmentVariables": [
                                 {
                                     "name": "AZ_SUB_ID",
