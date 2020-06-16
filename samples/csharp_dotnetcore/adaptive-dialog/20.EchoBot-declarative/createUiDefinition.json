@@ -24,7 +24,7 @@
                         "regex": "^[a-zA-Z][-a-zA-Z0-9]{4,32}$"
                     },
                     {
-                        "isValid": "[basics('botIdCheck').valid]",
+                        "isValid": "[equals(basics('botIdCheck').valid, true)]",
                         "message": "Bot id not available"
                     }
                 ]
