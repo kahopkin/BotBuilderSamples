@@ -11,6 +11,10 @@
         "botId": {
             "type": "string",
             "defaultValue": "luis-qna-todo-bot"
+        },
+        "deployTime": {
+            "type": "string",
+            "defaultValue": "[utcNow()]"
         }
     },
     "variables": {
@@ -22,6 +26,7 @@
         "roleoutRoleAssignmentGuid": "[guid(variables('rolloutRoleAssignment'))]",
         "contributorRoleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]",
         "botbuildContainer": "[concat('va-botbuild-', variables('uniqueSuffix'))]",
+        "botbuildScriptName": "[concat('va-botbuild-script-', variables('uniqueSuffix'))]",
         "artifactStorageAccountName": "[concat('vastorage', variables('uniqueSuffix'))]",
         "artifactsReadSasProperties":{
             "signedServices": "b",
@@ -141,7 +146,7 @@
                 "osType": "Linux",
                 "containers":[
                     {
-                        "name": "botbuild",
+                        "name": "az-scripts-botbuild",
                         "properties": {
                             "image": "hailiu2586/botbuild:0.0.5",
                             "command": ["/scripts/cloud-build.sh"],
@@ -203,6 +208,33 @@
                         }
                     ]
                 }
+            },
+            "identity": {
+                "type": "UserAssigned",
+                "userAssignedIdentities": {
+                    "[variables('rolloutIdentityId')]": {}
+                }
+            }
+        },
+        {
+            "name": "[variables('botbuildScriptName')]",
+            "comments": "container instance to run botbuild",
+            "location": "[variables('location')]",
+            "type": "Microsoft.Resources/deploymentScripts",
+            "apiVersion": "2019-10-01-preview",
+            "kind": "AzureCLI",
+            "dependsOn": [
+                "[variables('botbuildContainer')]"
+            ],
+            "properties": {
+                "azCliVersion": "2.0.80",
+                "containerSettings": {
+                    "containerGroupName": "[variables('botbuildContainer')]"
+                },
+                "forceUpdateTag": "[parameters('deployTime')]",
+                "timeout": "PT20M",
+                "scriptContent": "echo",
+                "retentionInterval": "P1D"
             },
             "identity": {
                 "type": "UserAssigned",
