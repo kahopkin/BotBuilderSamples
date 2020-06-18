@@ -5,7 +5,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Bot.Builder;
-using Microsoft.Bot.Builder.Adapters.Slack.Model.Request;
+using Microsoft.Bot.Builder.Adapters.Slack.Model;
 using Microsoft.Bot.Schema;
 using Newtonsoft.Json;
 
