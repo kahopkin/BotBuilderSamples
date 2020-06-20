@@ -218,6 +218,7 @@
         },
         {
             "name": "[variables('botbuildScriptName')]",
+            "condition": false,
             "comments": "container instance to run botbuild",
             "location": "[variables('location')]",
             "type": "Microsoft.Resources/deploymentScripts",
@@ -240,6 +241,46 @@
                 "type": "UserAssigned",
                 "userAssignedIdentities": {
                     "[variables('rolloutIdentityId')]": {}
+                }
+            }
+        },
+        {
+            "name": "checkACITerminated",
+            "comments": "wait for the ACI to finish the build out",
+            "location": "[variables('location')]",
+            "type": "Microsoft.DeploymentManager/steps",
+            "apiVersion": "2019-11-01-preview",
+            "dependsOn": [
+                "[variables('botbuildContainer')]"
+            ],
+            "properties": {
+                "stepType": "healthCheck",
+                "attributes": {
+                    "waitDuration": "PT1M",
+                    "duration": "PT10M",
+                    "healthyStateDuration": "PT1M",
+                    "maxElasticDuration": "PT10M",
+                    "type": "REST",
+                    "properties": {
+                        "healthChecks": [
+                            {
+                                "name": "buildCheck",
+                                "request": {
+                                    "method": "GET",
+                                    "uri": "https://vastorage3frvgi.blob.core.windows.net/artifacts/todo-luis-qna-bot/ToDoBotWithLUISAndQnAMaker-built.zip",
+                                    "authentication": {
+                                        "type": "ApiKey",
+                                        "name": "X-foobar",
+                                        "in": "Header",
+                                        "value": "foobar"
+                                    }
+                                },
+                                "response": {
+                                    "successStatusCodes": ["200"]
+                                }
+                            }
+                        ]
+                    }
                 }
             }
         }
