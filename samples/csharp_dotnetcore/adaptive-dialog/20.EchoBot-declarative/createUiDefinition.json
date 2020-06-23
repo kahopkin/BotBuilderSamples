@@ -69,8 +69,8 @@
                        "label": "Bot app id",
                        "type": "Microsoft.Common.TextBox",
                        "constraints": {
-                           "required": false,
-                           "regex": "/[-a-f0-9]+/"
+                           "required": true,
+                           "regex": "/[-a-fA-F0-9]{36}/"
                        }
                    },
                    {
