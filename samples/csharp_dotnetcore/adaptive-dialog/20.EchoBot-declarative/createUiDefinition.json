@@ -70,7 +70,7 @@
                        "type": "Microsoft.Common.TextBox",
                        "constraints": {
                            "required": true,
-                           "regex": "/[-a-fA-F0-9]{36}/"
+                           "regex": "^[-a-fA-F0-9]{36}$"
                        }
                    },
                    {
