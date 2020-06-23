@@ -6,7 +6,24 @@
             "type": "string"
         }
     },
-    "resources": [],
+    "variables": {
+        "location": "[resourceGroup().location]",
+        "uniqueSuffix": "[toLower(substring(uniqueString(resourceGroup().id, 'va-resources'), 0, 6))]",
+        "rolloutIdentity": "[concat('va-rollout-id-', variables('uniqueSuffix'))]",
+        "rolloutIdentityId": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('rolloutIdentity'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Resources/links",
+            "name": "link-rollout-identity",
+            "apiVersion": "2018-02-01",
+            "location": "[variables('location')]",
+            "properties": {
+                "targetId": "[variables('rolloutIdentityId')]",
+                "sourceId": "[resourceGroup().id]"
+            }
+         }
+    ],
     "outputs": {
         "emptyServiceUnit": {
             "type": "string",

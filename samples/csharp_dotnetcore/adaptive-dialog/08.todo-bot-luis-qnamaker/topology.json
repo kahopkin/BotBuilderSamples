@@ -3,7 +3,8 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "sasUri": {
-            "type": "string"
+            "type": "string",
+            "defaultValue": "https://vastorage3frvgi.blob.core.windows.net/emptyartifacts?sv=2019-02-02&st=2020-06-22T21%3A36%3A59Z&se=2020-06-23T21%3A36%3A59Z&sr=c&sp=rl&sig=Lmfii86Nx5IOKMKi3GTR2d5VHewagweyaRJX2fc1iBs%3D"
         }
     },
     "variables": {
@@ -81,51 +82,12 @@
                     ]
                   }
             ]
-        },
-        {
-            "type": "Microsoft.DeploymentManager/steps",
-            "apiVersion": "2018-09-01-preview",
-            "name": "waitStep",
-            "location": "[variables('location')]",
-            "properties": {
-                "stepType": "wait",
-                "attributes": {
-                  "duration": "PT1M"
-                }
-            }
-        },
-        {
-            "type": "Microsoft.DeploymentManager/rollouts",
-            "comments": "execute rollout",
-            "apiVersion": "2018-09-01-preview",
-            "name": "rollout",
-            "location": "[variables('location')]",
-            "Identity": {
-              "type": "userAssigned",
-              "identityIds": [
-                "[variables('rolloutIdentityId')]"
-              ]
-            },
-            "dependsOn": [
-              "empty-artifact"
-            ],
-            "properties": {
-              "buildVersion": "1.0.0.0",
-              "artifactSourceId": "[variables('artifactSourceId')]",
-              "targetServiceTopologyId": "[variables('topologyId')]",
-              "stepGroups": [
-                {
-                    "name": "stepGroup1",
-                    "preDeploymentSteps": [{
-                        "stepId": "[variables('stepId')]"
-                    }],
-                    "deploymentTargetId": "[resourceId('Microsoft.DeploymentManager/serviceTopologies/services/serviceUnits', 'empty-topology', 'empty-service', 'empty-service-unit')]",
-                    "postDeploymentSteps": [{
-                        "stepId": "[variables('stepId')]"
-                    }]
-                }
-              ]
-            }
         }
-    ]
+    ],
+    "outputs": {
+      "artifactUrl": {
+        "type": "string",
+        "value": "[concat(parameters('sasUri'), reference(variables('artifactSourceId'), '2018-09-01-preview', 'Full').properties.artifactRoot)]"
+      }
+    }
 }

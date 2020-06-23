@@ -1,0 +1,69 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "sasUri": {
+            "type": "string"
+        }
+    },
+    "variables": {
+        "location": "[resourceGroup().location]",
+        "uniqueSuffix": "[toLower(substring(uniqueString(resourceGroup().id, 'va-resources'), 0, 6))]",
+        "rolloutIdentity": "[concat('va-rollout-id-', variables('uniqueSuffix'))]",
+        "rolloutIdentityId": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('rolloutIdentity'))]",
+        "rolloutRoleAssignment": "[concat('va-rollout-role-', variables('uniqueSuffix'))]",
+        "topologyName": "empty-topology",
+        "topologyId": "[resourceId('Microsoft.DeploymentManager/serviceTopologies', variables('topologyName'))]",
+        "artifactName": "empty-artifact",
+        "artifactSourceId": "[resourceId('Microsoft.DeploymentManager/artifactSources', variables('artifactName'))]",
+        "stepName": "waitStep",
+        "stepId": "[resourceId('Microsoft.DeploymentManager/steps', variables('stepName'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.DeploymentManager/steps",
+            "apiVersion": "2018-09-01-preview",
+            "name": "waitStep",
+            "location": "[variables('location')]",
+            "properties": {
+                "stepType": "wait",
+                "attributes": {
+                "duration": "PT1M"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DeploymentManager/rollouts",
+            "comments": "execute rollout",
+            "apiVersion": "2018-09-01-preview",
+            "name": "[concat('rollout-', newGuid()]",
+            "location": "[variables('location')]",
+            "Identity": {
+            "type": "userAssigned",
+            "identityIds": [
+                "[variables('rolloutIdentityId')]"
+            ]
+            },
+            "dependsOn": [
+            "empty-artifact"
+            ],
+            "properties": {
+            "buildVersion": "1.0.0.0",
+            "artifactSourceId": "[variables('artifactSourceId')]",
+            "targetServiceTopologyId": "[variables('topologyId')]",
+            "stepGroups": [
+                {
+                    "name": "stepGroup1",
+                    "preDeploymentSteps": [{
+                        "stepId": "[variables('stepId')]"
+                    }],
+                    "deploymentTargetId": "[resourceId('Microsoft.DeploymentManager/serviceTopologies/services/serviceUnits', 'empty-topology', 'empty-service', 'empty-service-unit')]",
+                    "postDeploymentSteps": [{
+                        "stepId": "[variables('stepId')]"
+                    }]
+                }
+            ]
+            }
+        }
+    ]
+}

@@ -56,9 +56,9 @@ Or copy [creatUiDefintion.json](./createUiDefinition.json) to [create-ui-sandbox
 
 [1]:https://aka.ms/adaptive-dialogs
 [deploy-button]:https://aka.ms/deploytoazurebutton
-[arm-template]:https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmicrosoft%2FBotBuilder-Samples%2Fhailiu%2Farm-deploy%2Fsamples%2Fcsharp_dotnetcore%2Fadaptive-dialog%2F20.EchoBot-declarative%2Fazuredeploy.json
+[arm-template]:https://ms.portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmicrosoft%2FBotBuilder-Samples%2Fhailiu%2Farm-deploy%2Fsamples%2Fcsharp_dotnetcore%2Fadaptive-dialog%2F20.EchoBot-declarative%2Fazuredeploy.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fmicrosoft%2FBotBuilder-Samples%2Fhailiu%2Farm-deploy%2Fsamples%2Fcsharp_dotnetcore%2Fadaptive-dialog%2F20.EchoBot-declarative%2FcreateUiDefinition.json
 
-[arm-custom-ui]: https://portal.azure.com/#create/opslogix.TestCreateUIDef/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmicrosoft%2FBotBuilder-Samples%2Fhailiu%2Farm-deploy%2Fsamples%2Fcsharp_dotnetcore%2Fadaptive-dialog%2F20.EchoBot-declarative%2Fazuredeploy.json
+[arm-custom-ui]: https://ms.portal.azure.com/#create/opslogix.TestCreateUIDef/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmicrosoft%2FBotBuilder-Samples%2Fhailiu%2Farm-deploy%2Fsamples%2Fcsharp_dotnetcore%2Fadaptive-dialog%2F20.EchoBot-declarative%2Fazuredeploy.json
 
 
 [create-ui-blade]: https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmicrosoft%2FBotBuilder-Samples%2Fhailiu%2Farm-deploy%2Fsamples%2Fcsharp_dotnetcore%2Fadaptive-dialog%2F20.EchoBot-declarative%2Fazuredeploy.json
