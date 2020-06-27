@@ -4,7 +4,7 @@
     "parameters": {
         "sasUri": {
             "type": "string",
-            "defaultValue": "https://vastorage3frvgi.blob.core.windows.net/emptyartifacts?sv=2019-02-02&st=2020-06-22T21%3A36%3A59Z&se=2020-06-23T21%3A36%3A59Z&sr=c&sp=rl&sig=Lmfii86Nx5IOKMKi3GTR2d5VHewagweyaRJX2fc1iBs%3D"
+            "defaultValue": "https://vastorage3frvgi.blob.core.windows.net/emptyartifacts?sv=2019-02-02&st=2020-06-27T17%3A43%3A10Z&se=2021-06-28T13%3A23%3A00Z&sr=c&sp=rl&sig=PAEpsunTCZ4cWKyNpxmg6QDEODSQYQwB7UymUL7SB94%3D"
         }
     },
     "variables": {

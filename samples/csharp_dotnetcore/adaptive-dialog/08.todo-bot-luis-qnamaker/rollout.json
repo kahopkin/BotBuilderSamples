@@ -4,6 +4,10 @@
     "parameters": {
         "sasUri": {
             "type": "string"
+        },
+        "rolloutName": {
+            "type": "string",
+            "defaultValue": "[concat('rollout-', newGuid())]"
         }
     },
     "variables": {
@@ -36,7 +40,7 @@
             "type": "Microsoft.DeploymentManager/rollouts",
             "comments": "execute rollout",
             "apiVersion": "2018-09-01-preview",
-            "name": "[concat('rollout-', newGuid()]",
+            "name": "[parameters('rolloutName')]",
             "location": "[variables('location')]",
             "Identity": {
             "type": "userAssigned",
@@ -44,9 +48,7 @@
                 "[variables('rolloutIdentityId')]"
             ]
             },
-            "dependsOn": [
-            "empty-artifact"
-            ],
+            "dependsOn": [],
             "properties": {
             "buildVersion": "1.0.0.0",
             "artifactSourceId": "[variables('artifactSourceId')]",
