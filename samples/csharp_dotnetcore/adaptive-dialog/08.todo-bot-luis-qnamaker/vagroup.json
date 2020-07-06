@@ -15,6 +15,17 @@
         "deployTime": {
             "type": "string",
             "defaultValue": "[utcNow()]"
+        },
+        "rolloutName": {
+            "type": "string",
+            "defaultValue": "[concat('rollout-', newGuid())]"
+        },
+        "randomKeys": {
+            "type": "object",
+            "defaultValue": {
+                "key1": "[uniqueString(resourceGroup().id, newGuid())]",
+                "key2": "[uniqueString(resourceGroup().id, newGuid())]"
+            }
         }
     },
     "variables": {
@@ -28,6 +39,7 @@
         "botbuildContainer": "[concat('va-botbuild-', variables('uniqueSuffix'))]",
         "botbuildScriptName": "[concat('va-botbuild-script-', variables('uniqueSuffix'))]",
         "artifactStorageAccountName": "[concat('vastorage', variables('uniqueSuffix'))]",
+        "artifactStorageAccountId": "[resourceId('Microsoft.Storage/storageAccounts', variables('artifactStorageAccountName'))]",
         "artifactsReadSasProperties":{
             "signedServices": "b",
             "signedPermission": "r",
@@ -42,9 +54,112 @@
             "eastus": "westus",
             "centralus": "westus"
         },
-        "luisAuthorLocation": "[coalesce(variables('luisAuthorLocationIndex')[variables('location')], 'westus')]"
+        "luisAuthorLocation": "[coalesce(variables('luisAuthorLocationIndex')[variables('location')], 'westus')]",
+        "topologyName": "empty-topology",
+        "topologyId": "[resourceId('Microsoft.DeploymentManager/serviceTopologies', variables('topologyName'))]",
+        "checkBuildStepName": "checkBuildSuccessful",
+        "checkBuildStepId": "[resourceId('Microsoft.DeploymentManager/steps', variables('checkBuildStepName'))]",
+        "rolloutArtifactName": "empty-artifact",
+        "rolloutArtifactSourceId": "[resourceId('Microsoft.DeploymentManager/artifactSources', variables('rolloutArtifactName'))]",
+        "botAppZipPath": "[concat('artifacts/todo-luis-qna-bot/ToDoBotWithLUISAndQnAMaker-built-', parameters('rolloutName')  ,'.zip')]",
+        "serverFarmName": "[concat('va-runtime-farm-', variables('uniqueSuffix'))]",
+        "serverFarmId": "[resourceId('Microsoft.Web/serverFarms', variables('serverFarmName'))]",
+        "qnaName": "[concat('va-qna-', variables('uniqueSuffix'))]",
+        "qnaId": "[resourceId('Microsoft.CognitiveServices/accounts', variables('qnaName'))]",
+        "qnaSiteName": "[concat('va-qna-site-', variables('uniqueSuffix'))]",
+        "qnaSiteId": "[resourceId('Microsoft.Web/sites', variables('qnaSiteName'))]",
+        "azureSearchName": "[concat('va-qna-search-', variables('uniqueSuffix'))]",
+        "azureSearchId":  "[resourceId('Microsoft.Search/searchServices', variables('azureSearchName'))]"
     },
     "resources": [
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "comments": "shared runtime hosting server farm",
+            "apiVersion": "2018-02-01",
+            "name": "[variables('serverFarmName')]",
+            "location": "[variables('location')]",
+            "sku": {
+                "name": "P1v2",
+                "tier": "PremiumV2"
+            }
+        },
+        {
+            "name": "[variables('azureSearchName')]",
+            "comments": "shared QnA search",
+            "type": "Microsoft.Search/searchServices",
+            "apiVersion": "2015-08-19",
+            "location": "[variables('location')]",
+            "properties": {
+                "replicaCount": 1,
+                "partitionCount": 1,
+                "hostingMode": "Default"
+            },
+            "sku": {
+                "name": "standard"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2016-08-01",
+            "comments": "QnA runtime site",
+            "name": "[variables('qnaSiteName')]",
+            "location": "[variables('location')]",
+            "properties": {
+                "enabled": true,
+                "siteConfig": {
+                    "cors": {
+                        "allowedOrigins": [
+                            "*"
+                        ]
+                    }
+                },
+                "name": "[variables('qnaSiteName')]",
+                "serverFarmId": "[variables('serverFarmId')]",
+                "hostingEnvironment": ""
+            },
+            "dependsOn": [
+                "[variables('serverFarmId')]"
+            ],
+            "resources": [
+                {
+                    "apiVersion": "2015-08-01",
+                    "name": "appsettings",
+                    "type": "config",
+                    "dependsOn": [
+                        "[variables('qnaSiteName')]",
+                        "[variables('azureSearchId')]"
+                    ],
+                    "properties": {
+                        "AzureSearchName": "[variables('azureSearchName')]",
+                        "AzureSearchAdminKey": "[listAdminKeys(variables('azureSearchId'), '2015-08-19').primaryKey]",
+                        "PrimaryEndpointKey": "[concat(variables('qnaSiteName'), '-PrimaryEndpointKey')]",
+                        "SecondaryEndpointKey": "[concat(variables('qnaSiteName'), '-SecondaryEndpointKey')]",
+                        "DefaultAnswer": "No good match found in KB.",
+                        "QNAMAKER_EXTENSION_VERSION": "latest"
+                    }
+                }
+            ]
+        },
+        {
+            "type": "Microsoft.CognitiveServices/accounts",
+            "kind": "QnAMaker",
+            "name": "[variables('qnaName')]",
+            "apiVersion": "2017-04-18",
+            "location": "westus",
+            "sku": {
+                "name": "S0"
+            },
+            "properties": {
+                "apiProperties": {
+                    "qnaRuntimeEndpoint": "[concat('https://',reference(variables('qnaSiteId')).hostNames[0])]"
+                },
+                "customSubDomainName": "[variables('qnaName')]"
+            },
+            "dependsOn": [
+                "[variables('qnaSiteId')]",
+                "[variables('azureSearchId')]"
+            ]
+        },
         {
             "name": "[variables('rolloutIdentity')]",
             "comments": "user assigned managed identity for deployment manager rollout",
@@ -146,9 +261,9 @@
                 "osType": "Linux",
                 "containers":[
                     {
-                        "name": "az-scripts-botbuild",
+                        "name": "[concat('botbuild-', parameters('rolloutName'))]",
                         "properties": {
-                            "image": "hailiu2586/botbuild:0.0.5",
+                            "image": "hailiu2586/botbuild:0.0.9",
                             "command": ["/scripts/cloud-build.sh"],
                             "environmentVariables": [
                                 {
@@ -170,6 +285,10 @@
                                 {
                                     "name": "BOT_NAME",
                                     "value": "[parameters('botId')]"
+                                },
+                                {
+                                    "name": "BOT_ARTIFACT_SUFFIX",
+                                    "value": "[parameters('rolloutName')]"
                                 }
                             ],
                             "resources": {
@@ -217,41 +336,14 @@
             }
         },
         {
-            "name": "[variables('botbuildScriptName')]",
-            "condition": false,
-            "comments": "container instance to run botbuild",
-            "location": "[variables('location')]",
-            "type": "Microsoft.Resources/deploymentScripts",
-            "apiVersion": "2019-10-01-preview",
-            "kind": "AzureCLI",
-            "dependsOn": [
-                "[variables('botbuildContainer')]"
-            ],
-            "properties": {
-                "azCliVersion": "2.0.80",
-                "containerSettings": {
-                    "containerGroupName": "[variables('botbuildContainer')]"
-                },
-                "forceUpdateTag": "[parameters('deployTime')]",
-                "timeout": "PT20M",
-                "scriptContent": "echo",
-                "retentionInterval": "P1D"
-            },
-            "identity": {
-                "type": "UserAssigned",
-                "userAssignedIdentities": {
-                    "[variables('rolloutIdentityId')]": {}
-                }
-            }
-        },
-        {
-            "name": "checkACITerminated",
+            "name": "[variables('checkBuildStepName')]",
             "comments": "wait for the ACI to finish the build out",
             "location": "[variables('location')]",
             "type": "Microsoft.DeploymentManager/steps",
             "apiVersion": "2019-11-01-preview",
             "dependsOn": [
-                "[variables('botbuildContainer')]"
+                "[variables('botbuildContainer')]",
+                "[variables('artifactStorageAccountName')]"
             ],
             "properties": {
                 "stepType": "healthCheck",
@@ -267,7 +359,7 @@
                                 "name": "buildCheck",
                                 "request": {
                                     "method": "GET",
-                                    "uri": "https://vastorage3frvgi.blob.core.windows.net/artifacts/todo-luis-qna-bot/ToDoBotWithLUISAndQnAMaker-built.zip",
+                                    "uri": "[concat(reference(variables('artifactStorageAccountId'), '2017-10-01', 'full').properties.primaryEndpoints.blob, variables('botAppZipPath'))]",
                                     "authentication": {
                                         "type": "ApiKey",
                                         "name": "X-foobar",
@@ -283,6 +375,34 @@
                     }
                 }
             }
+        },
+        {
+            "type": "Microsoft.DeploymentManager/rollouts",
+            "comments": "execute rollout",
+            "apiVersion": "2018-09-01-preview",
+            "name": "[parameters('rolloutName')]",
+            "location": "[variables('location')]",
+            "Identity": {
+            "type": "userAssigned",
+            "identityIds": [
+                "[variables('rolloutIdentityId')]"
+            ]
+            },
+            "dependsOn": [],
+            "properties": {
+            "buildVersion": "1.0.0.0",
+            "artifactSourceId": "[variables('rolloutArtifactSourceId')]",
+            "targetServiceTopologyId": "[variables('topologyId')]",
+            "stepGroups": [
+                {
+                    "name": "stepGroup1",
+                    "preDeploymentSteps": [],
+                    "deploymentTargetId": "[resourceId('Microsoft.DeploymentManager/serviceTopologies/services/serviceUnits', 'empty-topology', 'empty-service', 'empty-service-unit')]",
+                    "postDeploymentSteps": [{
+                        "stepId": "[variables('checkBuildStepId')]"
+                    }]
+                }
+            ]}
         }
     ],
     "outputs": {

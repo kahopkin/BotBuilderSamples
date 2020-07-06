@@ -78,6 +78,23 @@
                                 "parametersArtifactSourceRelativePath": "empty-service-unit-parameters.json"
                               }
                             }
+                          },
+                          {
+                            "type": "serviceUnits",
+                            "apiVersion": "2018-09-01-preview",
+                            "name": "empty-service-unit-2",
+                            "location": "[variables('location')]",
+                            "dependsOn": [
+                              "empty-service"
+                            ],
+                            "properties": {
+                              "targetResourceGroup": "[resourceGroup().name]",
+                              "deploymentMode": "Incremental",
+                              "artifacts": {
+                                "templateArtifactSourceRelativePath": "empty-service-unit.json",
+                                "parametersArtifactSourceRelativePath": "empty-service-unit-parameters.json"
+                              }
+                            }
                           }
                     ]
                   }

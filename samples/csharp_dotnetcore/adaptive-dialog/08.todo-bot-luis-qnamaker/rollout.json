@@ -27,12 +27,35 @@
         {
             "type": "Microsoft.DeploymentManager/steps",
             "apiVersion": "2018-09-01-preview",
-            "name": "waitStep",
+            "name": "[concat('check-', parameters('rolloutName'))]",
             "location": "[variables('location')]",
             "properties": {
-                "stepType": "wait",
+                "stepType": "healthCheck",
                 "attributes": {
-                "duration": "PT1M"
+                    "waitDuration": "PT0M",
+                    "maxElasticDuration": "PT0M",
+                    "healthyStateDuration": "PT1M",
+                    "type": "REST",
+                    "properties": {
+                        "healthChecks": [
+                            {
+                                "name": "buildCheck",
+                                "request": {
+                                    "method": "GET",
+                                    "uri": "https://vastorage3frvgi.blob.core.windows.net/artifacts/todo-luis-qna-bot/ToDoBotWithLUISAndQnAMaker-built.zip",
+                                    "authentication": {
+                                        "type": "ApiKey",
+                                        "name": "X-foobar",
+                                        "in": "Header",
+                                        "value": "foobar"
+                                    }
+                                },
+                                "response": {
+                                    "successStatusCodes": ["200"]
+                                }
+                            }
+                        ]
+                    }
                 }
             }
         },
@@ -48,23 +71,30 @@
                 "[variables('rolloutIdentityId')]"
             ]
             },
-            "dependsOn": [],
+            "dependsOn": [
+                "[concat('check-', parameters('rolloutName'))]"
+            ],
             "properties": {
-            "buildVersion": "1.0.0.0",
-            "artifactSourceId": "[variables('artifactSourceId')]",
-            "targetServiceTopologyId": "[variables('topologyId')]",
-            "stepGroups": [
-                {
-                    "name": "stepGroup1",
-                    "preDeploymentSteps": [{
-                        "stepId": "[variables('stepId')]"
-                    }],
-                    "deploymentTargetId": "[resourceId('Microsoft.DeploymentManager/serviceTopologies/services/serviceUnits', 'empty-topology', 'empty-service', 'empty-service-unit')]",
-                    "postDeploymentSteps": [{
-                        "stepId": "[variables('stepId')]"
-                    }]
-                }
-            ]
+                "buildVersion": "1.0.0.0",
+                "artifactSourceId": "[variables('artifactSourceId')]",
+                "targetServiceTopologyId": "[variables('topologyId')]",
+                "stepGroups": [
+                    {
+                        "name": "stepGroup1",
+                        "preDeploymentSteps": [{
+                            "stepId": "[variables('stepId')]"
+                        }],
+                        "deploymentTargetId": "[resourceId('Microsoft.DeploymentManager/serviceTopologies/services/serviceUnits', 'empty-topology', 'empty-service', 'empty-service-unit')]",
+                        "postDeploymentSteps": []
+                    },
+                    {
+                        "name": "checkGroup",
+                        "dependsOnStepGroups": ["stepGroup1"],
+                        "preDeploymentSteps": [],
+                        "deploymentTargetId": "[resourceId('Microsoft.DeploymentManager/serviceTopologies/services/serviceUnits', 'empty-topology', 'empty-service', 'empty-service-unit-2')]",
+                        "postDeploymentSteps": []
+                    }
+                ]
             }
         }
     ]
