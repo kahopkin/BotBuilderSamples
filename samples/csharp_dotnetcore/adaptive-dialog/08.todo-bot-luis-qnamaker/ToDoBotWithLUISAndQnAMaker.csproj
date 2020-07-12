@@ -28,16 +28,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="**/*.dialog">
+    <Content Include="Dialogs/**/*.dialog">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="**/*.lg">
+    <Content Include="Dialogs/**/*.lg">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="**/*.lu">
+    <Content Include="Dialogs/**/*.lu">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="**/*.qna">
+    <Content Include="Dialogs/**/*.qna">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Update="appsettings.json">

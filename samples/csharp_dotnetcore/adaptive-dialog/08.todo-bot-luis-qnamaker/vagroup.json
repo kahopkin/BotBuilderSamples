@@ -12,6 +12,24 @@
             "type": "string",
             "defaultValue": "luis-qna-todo-bot"
         },
+        "sku": {
+            "type": "string",
+            "defaultValue": "S1",
+            "allowedValues": [
+                "F0",
+                "S1"
+            ]
+        },
+        "msAppId": {
+            "type": "string"
+        },
+        "msAppPassword": {
+            "type": "string"
+        },
+        "displayName": {
+            "type": "string",
+            "defaultValue": ""
+        },
         "deployTime": {
             "type": "string",
             "defaultValue": "[utcNow()]"
@@ -69,7 +87,13 @@
         "qnaSiteName": "[concat('va-qna-site-', variables('uniqueSuffix'))]",
         "qnaSiteId": "[resourceId('Microsoft.Web/sites', variables('qnaSiteName'))]",
         "azureSearchName": "[concat('va-qna-search-', variables('uniqueSuffix'))]",
-        "azureSearchId":  "[resourceId('Microsoft.Search/searchServices', variables('azureSearchName'))]"
+        "azureSearchId":  "[resourceId('Microsoft.Search/searchServices', variables('azureSearchName'))]",
+        "keyVaultName": "[concat('bot-secrets-', variables('uniqueSuffix'))]",
+        "appPasswordSecret": "[concat(parameters('botId'), '-pwd-', variables('uniqueSuffix'))]",
+        "appPasswordSecretId": "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), variables('appPasswordSecret'))]",
+        "botDisplayName": "[if(empty(parameters('displayName')), parameters('botId'), parameters('displayName'))]",
+        "botAppName": "[toLower(concat(parameters('botId'), '-', variables('uniqueSuffix')))]",
+        "botAppResId": "[resourceId('Microsoft.Web/sites', variables('botAppName'))]"
     },
     "resources": [
         {
@@ -359,12 +383,12 @@
                                 "name": "buildCheck",
                                 "request": {
                                     "method": "GET",
-                                    "uri": "[concat(reference(variables('artifactStorageAccountId'), '2017-10-01', 'full').properties.primaryEndpoints.blob, variables('botAppZipPath'))]",
+                                    "uri": "[concat(reference(variables('artifactStorageAccountId'), '2017-10-01', 'full').properties.primaryEndpoints.blob, variables('botAppZipPath'), '?', listAccountSas(variables('artifactStorageAccountName'), '2018-07-01', union(variables('artifactsReadSasProperties'), parameters('signedExpiry'))).accountSasToken)]",
                                     "authentication": {
                                         "type": "ApiKey",
-                                        "name": "X-foobar",
+                                        "name": "X-Noop",
                                         "in": "Header",
-                                        "value": "foobar"
+                                        "value": "noop"
                                     }
                                 },
                                 "response": {
@@ -403,6 +427,103 @@
                     }]
                 }
             ]}
+        },
+        {
+            "type": "Microsoft.KeyVault/vaults",
+            "name": "[variables('keyVaultName')]",
+            "location": "[variables('location')]",
+            "apiVersion": "2019-09-01",
+            "properties": {
+                "tenantId": "[subscription().tenantId]",
+                "sku": {
+                    "family": "A",
+                    "name": "Standard"
+                },
+                "accessPolicies": [],
+                "enabledForTemplateDeployment": true
+            },
+            "resources": [
+                {
+                    "type": "secrets",
+                    "name": "[variables('appPasswordSecret')]",
+                    "condition": "[not(empty(parameters('msAppPassword')))]",
+                    "apiVersion": "2019-09-01",
+                    "properties": {
+                        "value": "[parameters('msAppPassword')]"
+                    },
+                    "dependsOn": [
+                        "[variables('keyVaultName')]"
+                    ]
+                }
+            ]
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2018-11-01",
+            "kind": "app",
+            "name": "[variables('botAppName')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[variables('serverFarmName')]",
+                "[variables('appPasswordSecretId')]"
+            ],
+            "properties": {
+                "serverFarmId": "[variables('serverFarmId')]"
+            },
+            "identity": {
+                "type": "SystemAssigned"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/slots",
+            "name": "[concat(variables('botAppName'),'/staging')]",
+            "location": "[variables('location')]",
+            "apiVersion": "2018-11-01",
+            "dependsOn": [
+                "[variables('botAppName')]"
+            ],
+            "properties": {
+                "serverFarmId": "[variables('serverFarmId')]",
+                "siteConfig": {
+                    "appSettings":[]
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/config",
+            "name": "[concat(variables('botAppName'), '/slotConfigNames')]",
+            "dependsOn": [
+                "[variables('botAppName')]"
+            ],
+            "apiVersion": "2018-11-01",
+            "properties": {
+                "appSettingNames": [
+                    "MicrosoftAppId",
+                    "MicrosoftAppPassword",
+                    "WEBSITE_RUN_FROM_PACKAGE"
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.BotService/botServices",
+            "name": "[parameters('botId')]",
+            "kind": "bot",
+            "apiVersion": "2018-07-12",
+            "location": "global",
+            "sku": {
+                "name": "[parameters('sku')]"
+            },
+            "dependsOn": [
+                "[variables('botAppName')]"
+            ],
+            "properties": {
+                "displayName": "[variables('botDisplayName')]",
+                "endpoint": "[concat('https://', reference(variables('botAppResId'), '2018-02-01', 'Full').properties.hostNames[0], '/api/messages')]",
+                "msaAppId": "[parameters('msAppId')]"
+            },
+            "tags": {
+                "hostedBy": "[resourceId('Microsoft.Web/sites', variables('botAppName'))]"
+            }
         }
     ],
     "outputs": {
@@ -421,6 +542,10 @@
         "luisAuthorKey": {
             "type": "string",
             "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', variables('luisAuthoringName')), '2017-04-18').key1]"
+        },
+        "rolloutId": {
+            "type": "string",
+            "value": "[parameters('rolloutName')]"
         }
     }
 }
