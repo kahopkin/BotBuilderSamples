@@ -287,7 +287,7 @@
                     {
                         "name": "[concat('botbuild-', parameters('rolloutName'))]",
                         "properties": {
-                            "image": "hailiu2586/botbuild:0.0.9",
+                            "image": "hailiu2586/botbuild:0.1.5",
                             "command": ["/scripts/cloud-build.sh"],
                             "environmentVariables": [
                                 {
@@ -313,6 +313,10 @@
                                 {
                                     "name": "BOT_ARTIFACT_SUFFIX",
                                     "value": "[parameters('rolloutName')]"
+                                },
+                                {
+                                    "name": "BOT_WEB_APP",
+                                    "value": "[variables('botAppName')]"
                                 }
                             ],
                             "resources": {
