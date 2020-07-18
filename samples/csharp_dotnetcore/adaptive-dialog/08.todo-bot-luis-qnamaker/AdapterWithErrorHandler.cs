@@ -17,7 +17,7 @@ namespace Microsoft.BotBuilderSamples
         private Templates _templates;
         public AdapterWithErrorHandler(ICredentialProvider credentialProvider, ILogger<BotFrameworkHttpAdapter> logger, IStorage storage,
             UserState userState, ConversationState conversationState, IConfiguration configuration)
-            : base(credentialProvider)
+            : base(configuration, credentialProvider)
         {
             this.UseStorage(storage);
             this.UseBotState(userState);

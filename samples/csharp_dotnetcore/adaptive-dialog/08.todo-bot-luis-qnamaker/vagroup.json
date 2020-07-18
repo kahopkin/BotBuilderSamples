@@ -38,14 +38,46 @@
             "type": "string",
             "defaultValue": "[concat('rollout-', newGuid())]"
         },
+        "qnaBotName": {
+            "type": "string",
+            "defaultValue": null
+        },
         "randomKeys": {
             "type": "object",
             "defaultValue": {
                 "key1": "[uniqueString(resourceGroup().id, newGuid())]",
                 "key2": "[uniqueString(resourceGroup().id, newGuid())]"
             }
+        },
+        "botEnv": {
+            "type": "string",
+            "defaultValue": "prod"
         }
     },
+    "functions": [
+        {
+            "namespace": "ns",
+            "members": {
+                "keyValue": {
+                    "parameters": [
+                        {
+                            "name": "key",
+                            "type": "string"
+                        },
+                        {
+                            "name": "value",
+                            "type": "string"
+                        }
+                    ],
+                    "output": {
+                        "type": "object",
+                        "value": "[json(concat('{\"', parameters('key'), '\": \"', parameters('value'), '\"}'))]"
+                    }
+                }
+            }
+
+        }
+    ],
     "variables": {
         "location": "[resourceGroup().location]",
         "uniqueSuffix": "[toLower(substring(uniqueString(resourceGroup().id, 'va-resources'), 0, 6))]",
@@ -64,6 +96,8 @@
             "signedProtocol": "https",
             "signedResourceTypes": "o"
         },
+        "insightsName": "[concat('va-insight-', variables('uniqueSuffix'))]",
+        "insightsId": "[resourceId('Microsoft.Insights/components', variables('insightsName'))]",
         "luisAccountName": "[concat('va-luis-', variables('uniqueSuffix'))]",
         "luisAuthoringName": "[concat('va-luis-author-', variables('uniqueSuffix'))]",
         "luisAuthorLocationIndex": {
@@ -93,9 +127,40 @@
         "appPasswordSecretId": "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), variables('appPasswordSecret'))]",
         "botDisplayName": "[if(empty(parameters('displayName')), parameters('botId'), parameters('displayName'))]",
         "botAppName": "[toLower(concat(parameters('botId'), '-', variables('uniqueSuffix')))]",
-        "botAppResId": "[resourceId('Microsoft.Web/sites', variables('botAppName'))]"
+        "botAppResId": "[resourceId('Microsoft.Web/sites', variables('botAppName'))]",
+        "qnaBotName": "[coalesce(parameters('qnaBotName'), parameters('botId'))]",
+        "botAppSettingsMap": {
+            "scratch": {
+                "azureWebJobsBotFrameworkDirectLineEndpoint": "https://directline.scratch.botframework.com/",
+                "BotOpenIdMetadata": "https://login.scratch.botframework.com/v1/.well-known/openidconfiguration"
+            },
+            "ppe": {
+                "azureWebJobsBotFrameworkDirectLineEndpoint": "https://directline.ppe.botframework.com/",
+                "BotOpenIdMetadata": "https://login.ppe.botframework.com/v1/.well-known/openidconfiguration"
+            },
+            "prod": {
+            },
+            "core": {
+                "MicrosoftAppId": "[parameters('msAppId')]"
+            }
+        },
+        "botAppSettings": "[union(variables('botAppSettingsMap').core, variables('botAppSettingsMap')[parameters('botEnv')])]"
     },
     "resources": [
+        {
+            "type": "Microsoft.Insights/components",
+            "comments": "Shared app insights",
+            "name": "[variables('insightsName')]",
+            "apiVersion": "2018-05-01-preview",
+            "location": "[variables('location')]",
+            "tags": {
+                "[concat('hidden-link:', variables('botAppResId'))]": "Rescource"
+            },
+            "properties": {
+                "ApplicationId": "[variables('insightsName')]",
+                "Application_Type": "web"
+            }
+        },
         {
             "type": "Microsoft.Web/serverfarms",
             "comments": "shared runtime hosting server farm",
@@ -287,7 +352,7 @@
                     {
                         "name": "[concat('botbuild-', parameters('rolloutName'))]",
                         "properties": {
-                            "image": "hailiu2586/botbuild:0.1.5",
+                            "image": "hailiu2586/botbuild:0.1.10",
                             "command": ["/scripts/cloud-build.sh"],
                             "environmentVariables": [
                                 {
@@ -317,6 +382,10 @@
                                 {
                                     "name": "BOT_WEB_APP",
                                     "value": "[variables('botAppName')]"
+                                },
+                                {
+                                    "name": "QNA_BOT_NAME",
+                                    "value": "[variables('qnaBotName')]"
                                 }
                             ],
                             "resources": {
@@ -476,7 +545,20 @@
             },
             "identity": {
                 "type": "SystemAssigned"
-            }
+            },
+            "resources": [
+                {
+                    "type": "config",
+                    "name": "appsettings",
+                    "location": "[variables('location')]",
+                    "apiVersion": "2018-11-01",
+                    "dependsOn": [
+                        "[variables('botAppName')]",
+                        "[variables('insightsName')]"
+                    ],
+                    "properties": "[union(variables('botAppSettings'), ns.keyValue('APPINSIGHTS_INSTRUMENTATIONKEY', reference(variables('insightsId'), '2018-05-01-preview').InstrumentationKey),  ns.keyValue('MicrosoftAppPassword', concat('@Microsoft.KeyVault(SecretUri=', reference(variables('appPasswordSecretId'), '2019-09-01', 'Full').properties.secretUriWithVersion, ')')))]"
+                }
+            ]
         },
         {
             "type": "Microsoft.Web/sites/slots",
@@ -503,9 +585,27 @@
             "properties": {
                 "appSettingNames": [
                     "MicrosoftAppId",
-                    "MicrosoftAppPassword",
-                    "WEBSITE_RUN_FROM_PACKAGE"
+                    "MicrosoftAppPassword"
                 ]
+            }
+        },
+        {
+            "type": "Microsoft.KeyVault/vaults/accessPolicies",
+            "name": "[concat(variables('keyVaultName'), '/add')]",
+            "apiVersion": "2019-09-01",
+            "dependsOn": [
+                "[variables('keyVaultName')]",
+                "[variables('botAppResId')]"
+            ],
+            "properties": {
+                "accessPolicies" : [
+                {
+                    "tenantId": "[reference(variables('botAppResId'), '2019-08-01', 'Full').identity.tenantId]",
+                    "objectId": "[reference(variables('botAppResId'), '2019-08-01', 'Full').identity.principalId]",
+                    "permissions": {
+                        "secrets": [ "get" ]
+                    }
+                }]
             }
         },
         {
