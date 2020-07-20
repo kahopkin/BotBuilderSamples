@@ -352,7 +352,7 @@
                     {
                         "name": "[concat('botbuild-', parameters('rolloutName'))]",
                         "properties": {
-                            "image": "hailiu2586/botbuild:0.1.10",
+                            "image": "hailiu2586/botbuild:0.1.16",
                             "command": ["/scripts/cloud-build.sh"],
                             "environmentVariables": [
                                 {
