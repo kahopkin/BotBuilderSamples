@@ -9,5 +9,8 @@
   },
   "devDependencies": {
     "lerna": "^3.22.1"
+  },
+  "dependencies": {
+    "botbuilder-lg": "^4.10.0-preview-148939"
   }
 }
