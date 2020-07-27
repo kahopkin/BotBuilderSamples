@@ -52,6 +52,10 @@
         "botEnv": {
             "type": "string",
             "defaultValue": "prod"
+        },
+        "artifactsSasUrl": {
+            "type": "string",
+            "defaultValue": "https://botartifactswocgxn.blob.core.windows.net/artifacts?sv=2019-02-02&sp=rl&sr=c&st=2020-07-26&se=2030-07-24&sig=2ePX2wnWYt8%2B2z%2BzgUl2o5wBp5TlX8glGckLUog7Wgs%3D"
         }
     },
     "functions": [
@@ -147,6 +151,68 @@
         "botAppSettings": "[union(variables('botAppSettingsMap').core, variables('botAppSettingsMap')[parameters('botEnv')])]"
     },
     "resources": [
+        {
+            "type": "Microsoft.DeploymentManager/artifactSources",
+            "apiVersion": "2018-09-01-preview",
+            "name": "[variables('rolloutArtifactName')]",
+            "location": "[variables('location')]",
+            "properties": {
+              "sourceType": "AzureStorage",
+              "artifactRoot": "[variables('rolloutArtifactName')]",
+              "authentication": {
+                "type": "SAS",
+                "properties": {
+                  "sasUri": "[parameters('artifactsSasUrl')]"
+                }
+              }
+            }
+        },
+        {
+            "type": "Microsoft.DeploymentManager/serviceTopologies",
+            "apiVersion": "2018-09-01-preview",
+            "name": "empty-topology",
+            "location": "[variables('location')]",
+            "dependsOn": [
+              "[variables('rolloutArtifactName')]"
+            ],
+            "properties": {
+              "artifactSourceId": "[variables('rolloutArtifactSourceId')]"
+            },
+            "resources": [
+                {
+                    "type": "services",
+                    "apiVersion": "2018-09-01-preview",
+                    "name": "empty-service",
+                    "location": "[variables('location')]",
+                    "dependsOn": [
+                        "[variables('topologyName')]"
+                    ],
+                    "properties": {
+                      "targetSubscriptionId": "[subscription().subscriptionId]",
+                      "targetLocation": "[variables('location')]"
+                    },
+                    "resources": [
+                        {
+                            "type": "serviceUnits",
+                            "apiVersion": "2018-09-01-preview",
+                            "name": "empty-service-unit",
+                            "location": "[variables('location')]",
+                            "dependsOn": [
+                              "empty-service"
+                            ],
+                            "properties": {
+                              "targetResourceGroup": "[resourceGroup().name]",
+                              "deploymentMode": "Incremental",
+                              "artifacts": {
+                                "templateArtifactSourceRelativePath": "empty-service-unit.json",
+                                "parametersArtifactSourceRelativePath": "empty-service-unit-parameters.json"
+                              }
+                            }
+                          }
+                    ]
+                  }
+            ]
+        },
         {
             "type": "Microsoft.Insights/components",
             "comments": "Shared app insights",
@@ -352,7 +418,7 @@
                     {
                         "name": "[concat('botbuild-', parameters('rolloutName'))]",
                         "properties": {
-                            "image": "hailiu2586/botbuild:0.1.16",
+                            "image": "hailiu2586/botbuild:0.1.21",
                             "command": ["/scripts/cloud-build.sh"],
                             "environmentVariables": [
                                 {
@@ -366,6 +432,10 @@
                                 {
                                     "name": "AZ_USER_ASSIGNED_IDENTITY",
                                     "value": "[variables('rolloutIdentityId')]"
+                                },
+                                {
+                                    "name": "ARTIFACTS_SASURI",
+                                    "value": "[parameters('artifactsSasUrl')]"
                                 },
                                 {
                                     "name": "BOT_ARTIFACT",
@@ -480,12 +550,12 @@
             "name": "[parameters('rolloutName')]",
             "location": "[variables('location')]",
             "Identity": {
-            "type": "userAssigned",
-            "identityIds": [
-                "[variables('rolloutIdentityId')]"
-            ]
+                "type": "userAssigned",
+                "identityIds": [
+                    "[variables('rolloutIdentityId')]"
+                ]
             },
-            "dependsOn": [],
+            "dependsOn": ["empty-topology"],
             "properties": {
             "buildVersion": "1.0.0.0",
             "artifactSourceId": "[variables('rolloutArtifactSourceId')]",

@@ -1,0 +1,54 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "variables": {
+        "location": "[resourceGroup().location]",
+        "uniqueSuffix": "[toLower(substring(uniqueString(resourceGroup().id, 'bot-artifacts'), 0, 6))]",
+        "storageAccountName": "[concat('botartifacts', variables('uniqueSuffix'))]",
+        "storageAccountId": "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]",
+        "rolloutArtifactName": "empty-artifact",
+        "rolloutArtifactSourceId": "[resourceId('Microsoft.DeploymentManager/artifactSources', variables('rolloutArtifactName'))]"
+    },
+    "resources": [
+        {
+            "name": "[variables('storageAccountName')]",
+            "comments": "storage account for hosting deployment artifacts and scripts",
+            "location": "[variables('location')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2019-06-01",
+            "kind": "StorageV2",
+            "properties": {
+                "accessTier": "Hot",
+                "supportsHttpsTrafficOnly": true,
+                "networkAcls": {
+                    "bypass": "AzureServices",
+                    "defaultAction": "Allow",
+                    "ipRules": []
+                }
+            },
+            "sku": {
+                "name":"Standard_RAGRS"
+            },
+            "resources": [
+                {
+                    "name": "default/artifacts",
+                    "type": "blobServices/containers",
+                    "comments": "artifacts container",
+                    "apiVersion": "2019-06-01",
+                    "dependsOn": [
+                        "[variables('storageAccountName')]"
+                    ]
+                },
+                {
+                    "name": "default/templates",
+                    "type": "blobServices/containers",
+                    "comments": "bot templates container",
+                    "apiVersion": "2019-06-01",
+                    "dependsOn": [
+                        "[variables('storageAccountName')]"
+                    ]
+                }
+            ]
+        }
+    ]
+}
