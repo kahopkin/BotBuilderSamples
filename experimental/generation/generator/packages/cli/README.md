@@ -54,7 +54,7 @@ EXAMPLE
          $ bf dialog:generate sandwich.schema --output c:/tmp
 ```
 
-_See code: [src\commands\dialog\generate.ts](https://github.com/Microsoft/BotBuilder-Samples/blob/v1.0.0/src\commands\dialog\generate.ts)_
+_See code: [src/commands/dialog/generate.ts](https://github.com/Microsoft/BotBuilder-Samples/blob/v1.0.0/src/commands/dialog/generate.ts)_
 
 ## `bf dialog:generate:swagger PATH`
 
