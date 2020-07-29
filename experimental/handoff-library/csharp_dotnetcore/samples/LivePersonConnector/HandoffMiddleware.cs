@@ -60,8 +60,6 @@ namespace LivePersonConnector
 
             turnContext.OnSendActivities(async (sendTurnContext, activities, nextSend) =>
             {
-                // Handle any escalation events, and let them propagate through the pipeline
-                // This is useful for debugging with the Emulator
                 var handoffEvents = activities.Where(activity =>
                     activity.Type == ActivityTypes.Event && activity.Name == HandoffEventNames.InitiateHandoff);
 
@@ -70,6 +68,9 @@ namespace LivePersonConnector
                     var handoffEvent = handoffEvents.First();
                     conversationData.EscalationRecord = await Escalate(sendTurnContext, handoffEvent).ConfigureAwait(false);
                     await _conversationState.SaveChangesAsync(turnContext).ConfigureAwait(false);
+
+                    // Do not propagate the escalation event through the pipeline as it does not work with Teams channel
+                    return new ResourceResponse[] { };
                 }
 
                 // run full pipeline
