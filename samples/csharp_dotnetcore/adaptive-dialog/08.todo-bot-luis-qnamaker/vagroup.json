@@ -89,28 +89,12 @@
     "variables": {
         "location": "[resourceGroup().location]",
         "uniqueSuffix": "[toLower(substring(uniqueString(resourceGroup().id, 'va-resources'), 0, 6))]",
-        "rolloutIdentity": "[concat('va-rollout-id-', variables('uniqueSuffix'))]",
-        "rolloutIdentityId": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('rolloutIdentity'))]",
-        "rolloutRoleAssignment": "[concat('va-rollout-role-', variables('uniqueSuffix'))]",
-        "roleoutRoleAssignmentGuid": "[guid(variables('rolloutRoleAssignment'))]",
-        "contributorRoleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]",
+        "msiName": "[concat('va-rollout-id-', variables('uniqueSuffix'))]",
+        "msiId": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('msiName'))]",
         "botbuildContainer": "[concat('va-botbuild-', variables('uniqueSuffix'))]",
         "botbuildScriptName": "[concat('va-botbuild-script-', variables('uniqueSuffix'))]",
-        "artifactStorageAccountName": "[concat('vastorage', variables('uniqueSuffix'))]",
-        "artifactStorageAccountId": "[resourceId('Microsoft.Storage/storageAccounts', variables('artifactStorageAccountName'))]",
-        "artifactsReadSasProperties":{
-            "signedServices": "b",
-            "signedPermission": "r",
-            "signedProtocol": "https",
-            "signedResourceTypes": "o"
-        },
-        "luisAuthoringName": "[concat('va-luis-author-', variables('uniqueSuffix'))]",
-        "topologyName": "empty-topology",
-        "topologyId": "[resourceId('Microsoft.DeploymentManager/serviceTopologies', variables('topologyName'))]",
         "checkBuildStepName": "checkBuildSuccessful",
         "checkBuildStepId": "[resourceId('Microsoft.DeploymentManager/steps', variables('checkBuildStepName'))]",
-        "rolloutArtifactName": "empty-artifact",
-        "rolloutArtifactSourceId": "[resourceId('Microsoft.DeploymentManager/artifactSources', variables('rolloutArtifactName'))]",
         "botAppZipPath": "[concat('artifacts/todo-luis-qna-bot/ToDoBotWithLUISAndQnAMaker-built-', parameters('rolloutName')  ,'.zip')]",
         "keyVaultName": "[concat('bot-secrets-', variables('uniqueSuffix'))]",
         "appPasswordSecret": "[concat(parameters('botId'), '-pwd-', variables('uniqueSuffix'))]",
@@ -138,66 +122,16 @@
     },
     "resources": [
         {
-            "type": "Microsoft.DeploymentManager/artifactSources",
-            "apiVersion": "2018-09-01-preview",
-            "name": "[variables('rolloutArtifactName')]",
-            "location": "[variables('location')]",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2019-10-01",
+            "name": "deploy-topology",
             "properties": {
-              "sourceType": "AzureStorage",
-              "artifactRoot": "[variables('rolloutArtifactName')]",
-              "authentication": {
-                "type": "SAS",
-                "properties": {
-                  "sasUri": "[parameters('artifactsSasUrl')]"
-                }
+              "mode": "Incremental",
+              "templateLink": {
+                "uri": "[concat(parameters('armTemplateRoot'), 'topology.json')]",
+                "contentVersion":"1.0.0.0"
               }
             }
-        },
-        {
-            "type": "Microsoft.DeploymentManager/serviceTopologies",
-            "apiVersion": "2018-09-01-preview",
-            "name": "empty-topology",
-            "location": "[variables('location')]",
-            "dependsOn": [
-              "[variables('rolloutArtifactName')]"
-            ],
-            "properties": {
-              "artifactSourceId": "[variables('rolloutArtifactSourceId')]"
-            },
-            "resources": [
-                {
-                    "type": "services",
-                    "apiVersion": "2018-09-01-preview",
-                    "name": "empty-service",
-                    "location": "[variables('location')]",
-                    "dependsOn": [
-                        "[variables('topologyName')]"
-                    ],
-                    "properties": {
-                      "targetSubscriptionId": "[subscription().subscriptionId]",
-                      "targetLocation": "[variables('location')]"
-                    },
-                    "resources": [
-                        {
-                            "type": "serviceUnits",
-                            "apiVersion": "2018-09-01-preview",
-                            "name": "empty-service-unit",
-                            "location": "[variables('location')]",
-                            "dependsOn": [
-                              "empty-service"
-                            ],
-                            "properties": {
-                              "targetResourceGroup": "[resourceGroup().name]",
-                              "deploymentMode": "Incremental",
-                              "artifacts": {
-                                "templateArtifactSourceRelativePath": "empty-service-unit.json",
-                                "parametersArtifactSourceRelativePath": "empty-service-unit-parameters.json"
-                              }
-                            }
-                          }
-                    ]
-                  }
-            ]
         },
         {
             "type": "Microsoft.Resources/deployments",
@@ -256,164 +190,74 @@
             }
         },
         {
-            "name": "[variables('rolloutIdentity')]",
-            "comments": "user assigned managed identity for deployment manager rollout",
-            "location": "[variables('location')]",
-            "apiVersion": "2018-11-30",
-            "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
-            "properties": {}
-        },
-        {
-            "type": "Microsoft.Authorization/roleAssignments",
-            "comments": "assign contributor role on the resource group to the rollout identity",
-            "apiVersion": "2018-09-01-preview",
-            "dependsOn": [
-                "[variables('rolloutIdentity')]"
-            ],
-            "name": "[variables('roleoutRoleAssignmentGuid')]",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2019-10-01",
+            "name": "deploy-role",
             "properties": {
-                "roleDefinitionId": "[variables('contributorRoleDefinitionId')]",
-                "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('rolloutIdentity')), '2018-11-30', 'Full').properties.principalId]",
-                "scope": "[resourceGroup().id]"
+              "mode": "Incremental",
+              "templateLink": {
+                "uri": "[concat(parameters('armTemplateRoot'), 'role.json')]",
+                "contentVersion":"1.0.0.0"
+              }
             }
         },
         {
-            "name": "[variables('artifactStorageAccountName')]",
-            "comments": "storage account for hosting deployment artifacts and scripts",
-            "location": "[variables('location')]",
-            "type": "Microsoft.Storage/storageAccounts",
-            "apiVersion": "2019-06-01",
-            "kind": "StorageV2",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2019-10-01",
+            "name": "deploy-storage",
+            "dependsOn": [],
             "properties": {
-                "accessTier": "Hot",
-                "supportsHttpsTrafficOnly": true,
-                "networkAcls": {
-                    "bypass": "AzureServices",
-                    "defaultAction": "Allow",
-                    "ipRules": []
-                }
-            },
-            "sku": {
-                "name":"Standard_RAGRS"
-            },
-            "resources": [
-                {
-                    "name": "default/artifacts",
-                    "type": "blobServices/containers",
-                    "comments": "artifacts container",
-                    "apiVersion": "2019-06-01",
-                    "dependsOn": [
-                        "[variables('artifactStorageAccountName')]"
-                    ]
-                },
-                {
-                    "name": "default/transcripts",
-                    "type": "blobServices/containers",
-                    "comments": "transcripts container",
-                    "apiVersion": "2019-06-01",
-                    "dependsOn": [
-                        "[variables('artifactStorageAccountName')]"
-                    ]
-                }
-            ]
+              "mode": "Incremental",
+              "templateLink": {
+                "uri": "[concat(parameters('armTemplateRoot'), 'storage.json')]",
+                "contentVersion":"1.0.0.0"
+              }
+            }
         },
         {
-            "name": "[variables('botbuildContainer')]",
-            "comments": "container instance to run botbuild",
-            "location": "[variables('location')]",
-            "type": "Microsoft.ContainerInstance/containerGroups",
-            "apiVersion": "2018-10-01",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2019-10-01",
+            "name": "deploy-botBuild",
             "dependsOn": [
-                "[variables('roleoutRoleAssignmentGuid')]"
+                "deploy-role"
             ],
             "properties": {
-                "osType": "Linux",
-                "containers":[
-                    {
-                        "name": "[concat('botbuild-', parameters('rolloutName'))]",
-                        "properties": {
-                            "image": "hailiu2586/botbuild:0.1.21",
-                            "command": ["/scripts/cloud-build.sh"],
-                            "environmentVariables": [
-                                {
-                                    "name": "AZ_SUB_ID",
-                                    "value": "[subscription().subscriptionId]"
-                                },
-                                {
-                                    "name": "AZ_GROUP_NAME",
-                                    "value": "[resourceGroup().name]"
-                                },
-                                {
-                                    "name": "AZ_USER_ASSIGNED_IDENTITY",
-                                    "value": "[variables('rolloutIdentityId')]"
-                                },
-                                {
-                                    "name": "ARTIFACTS_SASURI",
-                                    "value": "[parameters('artifactsSasUrl')]"
-                                },
-                                {
-                                    "name": "BOT_ARTIFACT",
-                                    "value": "todo-luis-qna-bot/ToDoBotWithLUISAndQnAMaker.zip"
-                                },
-                                {
-                                    "name": "BOT_NAME",
-                                    "value": "[parameters('botId')]"
-                                },
-                                {
-                                    "name": "BOT_ARTIFACT_SUFFIX",
-                                    "value": "[parameters('rolloutName')]"
-                                },
-                                {
-                                    "name": "BOT_WEB_APP",
-                                    "value": "[variables('botAppName')]"
-                                },
-                                {
-                                    "name": "QNA_BOT_NAME",
-                                    "value": "[variables('qnaBotName')]"
-                                }
-                            ],
-                            "resources": {
-                                "requests": {
-                                    "cpu": 2,
-                                    "memoryInGB": 4
-                                },
-                                "limits": {
-                                    "cpu": 2,
-                                    "memoryInGB": 4
-                                }
-                            },
-                            "ports": [
-                                {
-                                    "port": 80
-                                },
-                                {
-                                    "port": 8080
-                                }
-                            ]
-                        }
-                    }
-                ],
-                "restartPolicy": "OnFailure",
-                "ipAddress": {
-                    "type": "Public",
-                    "dnsNameLabel": "[variables('botbuildContainer')]",
-                    "ports": [
+              "mode": "Incremental",
+              "templateLink": {
+                "uri": "[concat(parameters('armTemplateRoot'), 'botBuild.json')]",
+                "contentVersion":"1.0.0.0"
+              },
+              "parameters": {
+                  "botId": {
+                      "value": "[parameters('botId')]"
+                  },
+                  "rolloutName": {
+                      "value": "[parameters('rolloutName')]"
+                  },
+                  "msiId": {
+                      "value": "[reference('deploy-role').outputs.msiId.value]"
+                  },
+                  "env": {
+                    "value": [
                         {
-                            "protocol": "TCP",
-                            "port": 80
+                            "name": "ARTIFACTS_SASURI",
+                            "value": "[parameters('artifactsSasUrl')]"
                         },
                         {
-                            "protocol": "TCP",
-                            "port": 8080
+                            "name": "BOT_ARTIFACT",
+                            "value": "todo-luis-qna-bot/ToDoBotWithLUISAndQnAMaker.zip"
+                        },
+                        {
+                            "name": "BOT_WEB_APP",
+                            "value": "[variables('botAppName')]"
+                        },
+                        {
+                            "name": "QNA_BOT_NAME",
+                            "value": "[variables('qnaBotName')]"
                         }
                     ]
-                }
-            },
-            "identity": {
-                "type": "UserAssigned",
-                "userAssignedIdentities": {
-                    "[variables('rolloutIdentityId')]": {}
-                }
+                  }
+              }
             }
         },
         {
@@ -423,8 +267,8 @@
             "type": "Microsoft.DeploymentManager/steps",
             "apiVersion": "2019-11-01-preview",
             "dependsOn": [
-                "[variables('botbuildContainer')]",
-                "[variables('artifactStorageAccountName')]"
+                "deploy-botBuild",
+                "deploy-storage"
             ],
             "properties": {
                 "stepType": "healthCheck",
@@ -440,7 +284,7 @@
                                 "name": "buildCheck",
                                 "request": {
                                     "method": "GET",
-                                    "uri": "[concat(reference(variables('artifactStorageAccountId'), '2017-10-01', 'full').properties.primaryEndpoints.blob, variables('botAppZipPath'), '?', listAccountSas(variables('artifactStorageAccountName'), '2018-07-01', union(variables('artifactsReadSasProperties'), parameters('signedExpiry'))).accountSasToken)]",
+                                    "uri": "[concat(reference('deploy-storage').outputs.storageBlobEndpoint.value, variables('botAppZipPath'), '?', reference('deploy-storage').outputs.storageSasToken.value)]",
                                     "authentication": {
                                         "type": "ApiKey",
                                         "name": "X-Noop",
@@ -466,19 +310,19 @@
             "Identity": {
                 "type": "userAssigned",
                 "identityIds": [
-                    "[variables('rolloutIdentityId')]"
+                    "[variables('msiId')]"
                 ]
             },
-            "dependsOn": ["empty-topology"],
+            "dependsOn": ["deploy-topology", "deploy-role"],
             "properties": {
             "buildVersion": "1.0.0.0",
-            "artifactSourceId": "[variables('rolloutArtifactSourceId')]",
-            "targetServiceTopologyId": "[variables('topologyId')]",
+            "artifactSourceId": "[reference('deploy-topology').outputs.artifactId.value]",
+            "targetServiceTopologyId": "[reference('deploy-topology').outputs.topologyId.value]",
             "stepGroups": [
                 {
                     "name": "stepGroup1",
                     "preDeploymentSteps": [],
-                    "deploymentTargetId": "[resourceId('Microsoft.DeploymentManager/serviceTopologies/services/serviceUnits', 'empty-topology', 'empty-service', 'empty-service-unit')]",
+                    "deploymentTargetId": "[reference('deploy-topology').outputs.serviceUnitId.value]",
                     "postDeploymentSteps": [{
                         "stepId": "[variables('checkBuildStepId')]"
                     }]
@@ -522,6 +366,7 @@
             "location": "[variables('location')]",
             "dependsOn": [
                 "deploy-serverFarm",
+                "deploy-insights",
                 "[variables('appPasswordSecretId')]"
             ],
             "properties": {
@@ -617,11 +462,11 @@
     "outputs": {
         "vaRolloutId": {
             "type": "string",
-            "value": "[reference(variables('rolloutIdentityId'), '2018-11-30', 'Full').properties.principalId]"
+            "value": "[reference('deploy-role').outputs.principalId.value]"
         },
         "storageSasToken": {
             "type": "string",
-            "value": "[listAccountSas(variables('artifactStorageAccountName'), '2018-07-01', union(variables('artifactsReadSasProperties'), parameters('signedExpiry'))).accountSasToken]"
+            "value": "[reference('deploy-storage').outputs.storageSasToken.value]"
         },
         "luisAccountKey": {
             "type": "string",
