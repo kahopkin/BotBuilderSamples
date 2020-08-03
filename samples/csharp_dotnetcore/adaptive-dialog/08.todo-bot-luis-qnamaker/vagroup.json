@@ -56,6 +56,10 @@
         "artifactsSasUrl": {
             "type": "string",
             "defaultValue": "https://botartifactswocgxn.blob.core.windows.net/artifacts?sv=2019-02-02&sp=rl&sr=c&st=2020-07-26&se=2030-07-24&sig=2ePX2wnWYt8%2B2z%2BzgUl2o5wBp5TlX8glGckLUog7Wgs%3D"
+        },
+        "armTemplateRoot": {
+            "type": "string",
+            "defaultValue": "https://raw.githubusercontent.com/hailiu2586/botbuilder-dotnet-tools/hailiu/docker-botbuild/Templates/"
         }
     },
     "functions": [
@@ -100,17 +104,7 @@
             "signedProtocol": "https",
             "signedResourceTypes": "o"
         },
-        "insightsName": "[concat('va-insight-', variables('uniqueSuffix'))]",
-        "insightsId": "[resourceId('Microsoft.Insights/components', variables('insightsName'))]",
-        "luisAccountName": "[concat('va-luis-', variables('uniqueSuffix'))]",
         "luisAuthoringName": "[concat('va-luis-author-', variables('uniqueSuffix'))]",
-        "luisAuthorLocationIndex": {
-            "westus": "westus",
-            "westus2": "westus",
-            "eastus": "westus",
-            "centralus": "westus"
-        },
-        "luisAuthorLocation": "[coalesce(variables('luisAuthorLocationIndex')[variables('location')], 'westus')]",
         "topologyName": "empty-topology",
         "topologyId": "[resourceId('Microsoft.DeploymentManager/serviceTopologies', variables('topologyName'))]",
         "checkBuildStepName": "checkBuildSuccessful",
@@ -118,14 +112,6 @@
         "rolloutArtifactName": "empty-artifact",
         "rolloutArtifactSourceId": "[resourceId('Microsoft.DeploymentManager/artifactSources', variables('rolloutArtifactName'))]",
         "botAppZipPath": "[concat('artifacts/todo-luis-qna-bot/ToDoBotWithLUISAndQnAMaker-built-', parameters('rolloutName')  ,'.zip')]",
-        "serverFarmName": "[concat('va-runtime-farm-', variables('uniqueSuffix'))]",
-        "serverFarmId": "[resourceId('Microsoft.Web/serverFarms', variables('serverFarmName'))]",
-        "qnaName": "[concat('va-qna-', variables('uniqueSuffix'))]",
-        "qnaId": "[resourceId('Microsoft.CognitiveServices/accounts', variables('qnaName'))]",
-        "qnaSiteName": "[concat('va-qna-site-', variables('uniqueSuffix'))]",
-        "qnaSiteId": "[resourceId('Microsoft.Web/sites', variables('qnaSiteName'))]",
-        "azureSearchName": "[concat('va-qna-search-', variables('uniqueSuffix'))]",
-        "azureSearchId":  "[resourceId('Microsoft.Search/searchServices', variables('azureSearchName'))]",
         "keyVaultName": "[concat('bot-secrets-', variables('uniqueSuffix'))]",
         "appPasswordSecret": "[concat(parameters('botId'), '-pwd-', variables('uniqueSuffix'))]",
         "appPasswordSecretId": "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), variables('appPasswordSecret'))]",
@@ -214,106 +200,60 @@
             ]
         },
         {
-            "type": "Microsoft.Insights/components",
-            "comments": "Shared app insights",
-            "name": "[variables('insightsName')]",
-            "apiVersion": "2018-05-01-preview",
-            "location": "[variables('location')]",
-            "tags": {
-                "[concat('hidden-link:', variables('botAppResId'))]": "Rescource"
-            },
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2019-10-01",
+            "name": "deploy-insights",
             "properties": {
-                "ApplicationId": "[variables('insightsName')]",
-                "Application_Type": "web"
+              "mode": "Incremental",
+              "templateLink": {
+                "uri": "[concat(parameters('armTemplateRoot'), 'insights.json')]",
+                "contentVersion":"1.0.0.0"
+              }
             }
         },
         {
-            "type": "Microsoft.Web/serverfarms",
-            "comments": "shared runtime hosting server farm",
-            "apiVersion": "2018-02-01",
-            "name": "[variables('serverFarmName')]",
-            "location": "[variables('location')]",
-            "sku": {
-                "name": "P1v2",
-                "tier": "PremiumV2"
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2019-10-01",
+            "name": "deploy-serverFarm",
+            "properties": {
+              "mode": "Incremental",
+              "templateLink": {
+                "uri": "[concat(parameters('armTemplateRoot'), 'serverfarm.json')]",
+                "contentVersion":"1.0.0.0"
+              }
             }
         },
         {
-            "name": "[variables('azureSearchName')]",
-            "comments": "shared QnA search",
-            "type": "Microsoft.Search/searchServices",
-            "apiVersion": "2015-08-19",
-            "location": "[variables('location')]",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2019-10-01",
+            "name": "deploy-luis",
             "properties": {
-                "replicaCount": 1,
-                "partitionCount": 1,
-                "hostingMode": "Default"
-            },
-            "sku": {
-                "name": "standard"
+              "mode": "Incremental",
+              "templateLink": {
+                "uri": "[concat(parameters('armTemplateRoot'), 'luis.json')]",
+                "contentVersion":"1.0.0.0"
+              }
             }
         },
         {
-            "type": "Microsoft.Web/sites",
-            "apiVersion": "2016-08-01",
-            "comments": "QnA runtime site",
-            "name": "[variables('qnaSiteName')]",
-            "location": "[variables('location')]",
-            "properties": {
-                "enabled": true,
-                "siteConfig": {
-                    "cors": {
-                        "allowedOrigins": [
-                            "*"
-                        ]
-                    }
-                },
-                "name": "[variables('qnaSiteName')]",
-                "serverFarmId": "[variables('serverFarmId')]",
-                "hostingEnvironment": ""
-            },
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2019-10-01",
+            "name": "deploy-qna",
             "dependsOn": [
-                "[variables('serverFarmId')]"
+                "deploy-serverFarm"
             ],
-            "resources": [
-                {
-                    "apiVersion": "2015-08-01",
-                    "name": "appsettings",
-                    "type": "config",
-                    "dependsOn": [
-                        "[variables('qnaSiteName')]",
-                        "[variables('azureSearchId')]"
-                    ],
-                    "properties": {
-                        "AzureSearchName": "[variables('azureSearchName')]",
-                        "AzureSearchAdminKey": "[listAdminKeys(variables('azureSearchId'), '2015-08-19').primaryKey]",
-                        "PrimaryEndpointKey": "[concat(variables('qnaSiteName'), '-PrimaryEndpointKey')]",
-                        "SecondaryEndpointKey": "[concat(variables('qnaSiteName'), '-SecondaryEndpointKey')]",
-                        "DefaultAnswer": "No good match found in KB.",
-                        "QNAMAKER_EXTENSION_VERSION": "latest"
-                    }
-                }
-            ]
-        },
-        {
-            "type": "Microsoft.CognitiveServices/accounts",
-            "kind": "QnAMaker",
-            "name": "[variables('qnaName')]",
-            "apiVersion": "2017-04-18",
-            "location": "westus",
-            "sku": {
-                "name": "S0"
-            },
             "properties": {
-                "apiProperties": {
-                    "qnaRuntimeEndpoint": "[concat('https://',reference(variables('qnaSiteId')).hostNames[0])]"
-                },
-                "customSubDomainName": "[variables('qnaName')]"
-            },
-            "dependsOn": [
-                "[variables('qnaSiteId')]",
-                "[variables('azureSearchId')]"
-            ]
+              "mode": "Incremental",
+              "templateLink": {
+                "uri": "[concat(parameters('armTemplateRoot'), 'qna.json')]",
+                "contentVersion":"1.0.0.0"
+              },
+              "parameters": {
+                  "serverFarmId": {
+                      "value": "[reference('deploy-serverFarm').outputs.serverFarmId.value]"
+                  }
+              }
+            }
         },
         {
             "name": "[variables('rolloutIdentity')]",
@@ -376,32 +316,6 @@
                     ]
                 }
             ]
-        },
-        {
-            "name": "[variables('luisAccountName')]",
-            "comments": "LUIS cognitive service account for LUIS",
-            "location": "[variables('location')]",
-            "type": "Microsoft.CognitiveServices/accounts",
-            "apiVersion": "2016-02-01-preview",
-            "kind": "LUIS",
-            "sku": {
-                "name": "S0"
-            },
-            "properties": {
-            }
-        },
-        {
-            "name": "[variables('luisAuthoringName')]",
-            "comments": "LUIS cognitive service account for LUIS",
-            "location": "[variables('luisAuthorLocation')]",
-            "type": "Microsoft.CognitiveServices/accounts",
-            "apiVersion": "2017-04-18",
-            "kind": "LUIS.Authoring",
-            "sku": {
-                "name": "F0"
-            },
-            "properties": {
-            }
         },
         {
             "name": "[variables('botbuildContainer')]",
@@ -607,11 +521,11 @@
             "name": "[variables('botAppName')]",
             "location": "[variables('location')]",
             "dependsOn": [
-                "[variables('serverFarmName')]",
+                "deploy-serverFarm",
                 "[variables('appPasswordSecretId')]"
             ],
             "properties": {
-                "serverFarmId": "[variables('serverFarmId')]"
+                "serverFarmId": "[reference('deploy-serverFarm').outputs.serverFarmId.value]"
             },
             "identity": {
                 "type": "SystemAssigned"
@@ -624,9 +538,9 @@
                     "apiVersion": "2018-11-01",
                     "dependsOn": [
                         "[variables('botAppName')]",
-                        "[variables('insightsName')]"
+                        "deploy-insights"
                     ],
-                    "properties": "[union(variables('botAppSettings'), ns.keyValue('APPINSIGHTS_INSTRUMENTATIONKEY', reference(variables('insightsId'), '2018-05-01-preview').InstrumentationKey),  ns.keyValue('MicrosoftAppPassword', concat('@Microsoft.KeyVault(SecretUri=', reference(variables('appPasswordSecretId'), '2019-09-01', 'Full').properties.secretUriWithVersion, ')')))]"
+                    "properties": "[union(variables('botAppSettings'), ns.keyValue('APPINSIGHTS_INSTRUMENTATIONKEY', reference('deploy-insights').outputs.instrumentationKey.value),  ns.keyValue('MicrosoftAppPassword', concat('@Microsoft.KeyVault(SecretUri=', reference(variables('appPasswordSecretId'), '2019-09-01', 'Full').properties.secretUriWithVersion, ')')))]"
                 }
             ]
         },
@@ -639,7 +553,7 @@
                 "[variables('botAppName')]"
             ],
             "properties": {
-                "serverFarmId": "[variables('serverFarmId')]",
+                "serverFarmId": "[reference('deploy-serverFarm').outputs.serverFarmId.value]",
                 "siteConfig": {
                     "appSettings":[]
                 }
@@ -711,11 +625,11 @@
         },
         "luisAccountKey": {
             "type": "string",
-            "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', variables('luisAccountName')), '2017-04-18').key1]"
+            "value": "[reference('deploy-luis').outputs.luisAccountKey.value]"
         },
         "luisAuthorKey": {
             "type": "string",
-            "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', variables('luisAuthoringName')), '2017-04-18').key1]"
+            "value": "[reference('deploy-luis').outputs.luisAuthorKey.value]"
         },
         "rolloutId": {
             "type": "string",
