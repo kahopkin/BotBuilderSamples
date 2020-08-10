@@ -27,9 +27,9 @@
                         "isValid": "[equals(basics('botIdCheck').valid, true)]",
                         "message": "Bot id not available"
                     }
-                ]
+                ]}
             }
-       }],
+        ],
        "steps": [
            {
                "name": "hosting",
@@ -66,22 +66,18 @@
                "elements": [
                    {
                        "name": "msAppId",
-                       "label": "Bot app id",
-                       "type": "Microsoft.Common.TextBox",
-                       "constraints": {
-                           "required": true,
-                           "regex": "^[-a-fA-F0-9]{36}$"
-                       }
-                   },
-                   {
-                       "name": "msAppPassword",
-                       "label": "Bot app password",
-                       "type": "Microsoft.Common.PasswordBox",
-                       "constraints": {
-                           "required": false
+                       "type": "Microsoft.Common.ServicePrincipalSelector",
+                       "label": {
+                           "sectionHeader": "Bot App registraiton",
+                           "principalId": "AppId",
+                           "password": "App secret"
+                       },
+                       "defaultValue": {
+                           "principalId": "",
+                           "name": "(new) botApp id"
                        },
                        "options": {
-                        "hideConfirmation": true
+                           "hideCertificate": true
                        }
                    }
                ]
@@ -91,8 +87,8 @@
            "botId": "[basics('botId')]",
            "existingServerFarmId": "[steps('hosting').existingServerFarm.id]",
            "existingServerFarmLocation": "[steps('hosting').existingServerFarm.location]",
-           "msAppId": "[steps('overrides').msAppId]",
-           "msAppPassword": "[steps('overrides').msAppPassword]"
+           "msAppId": "[steps('overrides').msAppId.appId]",
+           "msAppPassword": "[steps('overrides').password]"
        },
        "resourceTypes": [ "Microsoft.BotService/bots", "Micrsosoft.KeyVault/vaults", "Microsoft.Web/sites", "Microsoft.Web/serverfarms"]
     }
