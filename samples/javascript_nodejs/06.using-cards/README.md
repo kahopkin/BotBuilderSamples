@@ -19,6 +19,8 @@ This bot has been created using [Microsoft Bot Framework][1], it shows how to cr
 
     ```bash
     git clone https://github.com/microsoft/botbuilder-samples.git
+    
+    git clone https://github.com/kahopkin/BotBuilderSamples.git
     ```
 
 - In a terminal, navigate to `samples/javascript_nodejs/06.using-cards`
